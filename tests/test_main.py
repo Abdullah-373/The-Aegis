@@ -20,7 +20,8 @@ database.SessionLocal.configure(bind=database.engine)
 import main  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from main import (  # noqa: E402
-    FinalAnswer, _extract_final_json, _hash_content, _heuristic_answer,
+    FinalAnswer, _chunk_text, _estimate_cost, _extract_final_json,
+    _hash_content, _heuristic_answer, _is_transient, MODEL_PRICES,
 )
 
 client = TestClient(main.app)
@@ -135,3 +136,91 @@ def test_ws_rejects_bad_model():
 def test_delete_nonexistent_cache():
     r = client.delete("/api/cache/999999")
     assert r.status_code == 404
+
+
+def test_get_nonexistent_verdict():
+    r = client.get("/api/verdict/999999")
+    assert r.status_code == 404
+
+
+def test_chunk_text_under_size():
+    chunks = _chunk_text("hello world", size=100, overlap=10)
+    assert chunks == ["hello world"]
+
+
+def test_chunk_text_splits_with_overlap():
+    text = "a" * 200
+    chunks = _chunk_text(text, size=80, overlap=20)
+    assert len(chunks) >= 3
+    # overlap means consecutive chunks share tail/head
+    for i in range(len(chunks) - 1):
+        assert len(chunks[i]) == 80
+        # next chunk starts inside the previous chunk's content
+        assert chunks[i][-20:] == chunks[i + 1][:20]
+
+
+def test_is_transient_recognises_common_errors():
+    for s in ("503 Service Unavailable", "429 Too Many Requests",
+              "Connection reset by peer", "Deadline Exceeded", "overloaded"):
+        assert _is_transient(s), s
+    for s in ("401 Unauthorized", "API key not valid", "permission denied"):
+        assert not _is_transient(s), s
+
+
+def test_estimate_cost_uses_per_million_prices():
+    # 1M input + 1M output on flash should equal the listed prices summed.
+    in_p, out_p = MODEL_PRICES["gemini-2.5-flash"]
+    cost = _estimate_cost("gemini-2.5-flash", 1_000_000, 1_000_000)
+    assert abs(cost - (in_p + out_p)) < 0.0001
+
+
+def test_estimate_cost_falls_back_for_unknown_model():
+    cost = _estimate_cost("unknown-model", 1_000, 1_000)
+    assert cost >= 0  # uses default, doesn't crash
+
+
+def test_health_reports_ocr_flag():
+    r = client.get("/health")
+    body = r.json()
+    assert "ocr" in body
+    assert isinstance(body["ocr"], bool)
+    assert "models" in body
+
+
+def test_get_verdict_returns_full_record_when_seeded():
+    db = database.SessionLocal()
+    try:
+        row = database.VerdictCache(
+            pdf_filename="test.pdf",
+            content_hash="test-hash-xyz",
+            model_used="gemini-2.5-flash",
+            alex_output="alex text",
+            sam_output="sam text",
+            maya_output="maya text",
+            verdict="GO",
+            risk_score=20,
+            headline="all clear",
+            structured_json='{"verdict":"GO","risk_score":20,"headline":"all clear","risks":[],"conditions":[]}',
+            execution_time=12.3,
+            total_tokens=500,
+            input_tokens=300,
+            output_tokens=200,
+            cost_usd=0.0015,
+            truncated=False,
+            chunked=False,
+            pdf_chars=1000,
+        )
+        db.add(row)
+        db.commit()
+        cache_id = row.id
+    finally:
+        db.close()
+
+    r = client.get(f"/api/verdict/{cache_id}")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["verdict"] == "GO"
+    assert data["risk_score"] == 20
+    assert data["transcripts"]["alex"] == "alex text"
+    assert data["transcripts"]["maya"] == "maya text"
+    assert data["structured"]["verdict"] == "GO"

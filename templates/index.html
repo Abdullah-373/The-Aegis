@@ -280,7 +280,12 @@
                 <div id="fileName" class="text-sm font-medium text-ink-900 truncate"></div>
                 <div id="fileSize" class="text-xs text-ink-500"></div>
               </div>
-              <button type="button" id="fileClear" class="text-ink-400 hover:text-ink-700 transition p-1">
+              <button type="button" id="fileReplace" data-stop-pick
+                class="text-xs font-medium text-indigo-600 hover:text-indigo-700 transition px-2 py-1">
+                Replace
+              </button>
+              <button type="button" id="fileClear" data-stop-pick
+                class="text-ink-400 hover:text-ink-700 transition p-1">
                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
               </button>
             </div>
@@ -703,6 +708,11 @@
   }
   els.pdfFile.addEventListener('change', (e) => pickFile(e.target.files[0]));
   els.fileClear.addEventListener('click', clearFile);
+  $('fileReplace').addEventListener('click', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    els.pdfFile.value = '';  // so re-picking the same file fires `change`
+    els.pdfFile.click();
+  });
   ['dragenter','dragover'].forEach(ev => els.dropZone.addEventListener(ev, e => {
     e.preventDefault(); e.stopPropagation(); els.dropZone.classList.add('drag');
   }));
@@ -871,23 +881,29 @@
       if (n >= target) clearInterval(els.gaugeScore._t);
     }, 28);
 
-    // Cache badge
+    // Cache badge + time metric. Only one source of truth for the time field.
     if (msg.cached) {
       els.cacheBadge.classList.remove('hidden');
-      els.cacheTime.textContent = `${msg.original_time}s saved`;
-      els.metricTime.innerHTML = `<span class="text-emerald-700">0.97s</span> <span class="text-xs text-ink-500 font-normal">(cached)</span>`;
-      // The 0.97s above is symbolic for the cached replay — replaced by the live elapsed from cache hit
+      const measured = state.measuredElapsed || 0;
+      const saved = (typeof msg.original_time === 'number') ? msg.original_time : 0;
+      els.cacheTime.textContent = `${measured.toFixed(2)}s · saved ${saved.toFixed(2)}s`;
+      els.metricTime.innerHTML =
+        `<span class="text-emerald-700">${measured.toFixed(2)}s</span> ` +
+        `<span class="text-xs text-ink-500 font-normal">cached</span>`;
     } else {
       els.cacheBadge.classList.add('hidden');
-      els.metricTime.textContent = `${msg.execution_time}s`;
+      els.metricTime.textContent = `${(msg.execution_time || 0).toFixed(2)}s`;
     }
-    // Use actual measured elapsed in case server-side reports zero
-    const measuredElapsed = state.measuredElapsed || msg.execution_time || 0;
-    if (msg.cached) els.metricTime.innerHTML = `<span class="text-emerald-700">${measuredElapsed.toFixed(2)}s</span> <span class="text-xs text-ink-500 font-normal">cached</span>`;
     els.metricTokens.textContent = (msg.total_tokens || 0).toLocaleString();
-    els.metricCost.textContent = (typeof msg.estimated_cost_usd === 'number' && !msg.cached)
-      ? `$${msg.estimated_cost_usd.toFixed(4)}`
-      : '$0.0000';
+    if (msg.cached) {
+      const orig = typeof msg.original_cost_usd === 'number' ? msg.original_cost_usd : 0;
+      els.metricCost.innerHTML =
+        `<span class="text-emerald-700">$0.0000</span> ` +
+        `<span class="text-xs text-ink-500 font-normal">saved $${orig.toFixed(4)}</span>`;
+    } else {
+      els.metricCost.textContent = (typeof msg.estimated_cost_usd === 'number')
+        ? `$${msg.estimated_cost_usd.toFixed(4)}` : '$0.0000';
+    }
     els.metricModel.textContent = msg.model || state.model;
 
     // Conditions
@@ -1068,6 +1084,10 @@
   $('closeDrawer').addEventListener('click', closeDrawer);
   els.drawerBackdrop.addEventListener('click', closeDrawer);
 
+  // Hardcoded variant lookup so Tailwind's JIT actually emits the classes.
+  const HOVER_BORDER = { GO: 'hover:border-emerald-300', 'NO-GO': 'hover:border-rose-300', 'CONDITIONAL-GO': 'hover:border-amber-300' };
+  const VERDICT_KIND = { GO: 'success', 'NO-GO': 'error', 'CONDITIONAL-GO': 'warn' };
+
   async function loadArchive() {
     els.archiveBody.innerHTML = `<div class="space-y-3">${'<div class="skel h-24 rounded-xl"></div>'.repeat(3)}</div>`;
     try {
@@ -1080,24 +1100,26 @@
       els.archiveBody.innerHTML = '';
       rows.forEach(row => {
         const v = row.verdict;
-        const accent = v === 'GO' ? 'emerald' : v === 'NO-GO' ? 'rose' : 'amber';
-        const kind   = v === 'GO' ? 'success' : v === 'NO-GO' ? 'error' : 'warn';
-        const card = document.createElement('div');
-        card.className = `card-soft p-4 hover:border-${accent}-200 transition`;
+        const hoverBorder = HOVER_BORDER[v] || 'hover:border-indigo-300';
+        const kind = VERDICT_KIND[v] || 'info';
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = `card-soft p-4 text-left w-full ${hoverBorder} hover:shadow-sm transition`;
+        card.dataset.openId = row.id;
         card.innerHTML = `
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0 flex-1">
               <div class="text-sm font-semibold text-ink-900 truncate" title="${escapeHtml(row.filename)}">${escapeHtml(row.filename)}</div>
-              <div class="text-xs text-ink-500 mt-1">${escapeHtml(row.headline || '—')}</div>
+              <div class="text-xs text-ink-500 mt-1 line-clamp-2">${escapeHtml(row.headline || '—')}</div>
             </div>
-            <button class="text-ink-400 hover:text-rose-600 transition p-1" data-del="${row.id}">
+            <span class="text-ink-400 hover:text-rose-600 transition p-1 cursor-pointer" data-del="${row.id}" role="button">
               <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            </button>
+            </span>
           </div>
           <div class="flex items-center gap-2 mt-3 flex-wrap">
             <span class="pill pill-${kind}">${friendly(v)}</span>
             <span class="pill pill-neutral">Risk ${row.risk_score}</span>
-            <span class="pill pill-neutral">${row.model}</span>
+            <span class="pill pill-neutral">${escapeHtml(row.model)}</span>
           </div>
           <div class="text-[11px] text-ink-400 font-mono mt-3">
             ${row.execution_time}s · ~${(row.total_tokens||0).toLocaleString()} tokens · ${row.created_at ? new Date(row.created_at).toLocaleString() : ''}
@@ -1107,16 +1129,83 @@
       els.archiveBody.querySelectorAll('[data-del]').forEach(btn => {
         btn.addEventListener('click', async (e) => {
           e.stopPropagation();
+          e.preventDefault();
           const id = btn.getAttribute('data-del');
           await fetch(`/api/cache/${id}`, { method: 'DELETE' });
           toast('Report deleted', 'ok');
           loadArchive();
         });
       });
+      els.archiveBody.querySelectorAll('[data-open-id]').forEach(card => {
+        card.addEventListener('click', async (e) => {
+          if (e.target.closest('[data-del]')) return;
+          const id = card.getAttribute('data-open-id');
+          await openCachedVerdict(id);
+        });
+      });
     } catch (err) {
       els.archiveBody.innerHTML = `<div class="text-sm text-rose-600">Could not load reports: ${escapeHtml(err.message)}</div>`;
     }
   }
+
+  async function openCachedVerdict(id) {
+    try {
+      const r = await fetch(`/api/verdict/${id}`);
+      if (!r.ok) throw new Error('Not found');
+      const data = await r.json();
+      // Reconstruct a verdict-message-shaped object for renderVerdict
+      state.raw = { ...data.transcripts };
+      state.measuredElapsed = data.execution_time || 0;
+      const msg = {
+        verdict: data.verdict,
+        risk_score: data.risk_score,
+        headline: data.headline,
+        structured: data.structured || {},
+        cached: true,
+        execution_time: 0.0,
+        original_time: data.execution_time,
+        total_tokens: data.total_tokens,
+        input_tokens: data.input_tokens,
+        output_tokens: data.output_tokens,
+        model: data.model,
+        estimated_cost_usd: 0,
+        original_cost_usd: data.cost_usd || 0,
+      };
+      els.truncBadge.classList.toggle('hidden', !data.truncated);
+      els.headerModel.textContent = data.model;
+      els.headerModel.classList.remove('hidden');
+      renderVerdict(msg);
+      closeDrawer();
+      setView('verdict');
+      toast('Loaded from cache', 'ok');
+    } catch (err) {
+      toast('Could not load this report', 'error');
+    }
+  }
+
+  // ---------------- Keyboard shortcuts ----------------------------------
+  document.addEventListener('keydown', (e) => {
+    const isMac = navigator.platform.toLowerCase().includes('mac');
+    const meta = isMac ? e.metaKey : e.ctrlKey;
+
+    // Cmd/Ctrl + Enter → start analysis from setup
+    if (meta && e.key === 'Enter' && state.view === 'setup' && !els.startBtn.disabled) {
+      e.preventDefault();
+      els.startBtn.click();
+      return;
+    }
+
+    // Esc → close drawer, or cancel running analysis, or go back to setup from verdict
+    if (e.key === 'Escape') {
+      if (els.drawer.classList.contains('open')) {
+        closeDrawer();
+      } else if (state.view === 'analysis') {
+        els.cancelBtn.click();
+      } else if (state.view === 'verdict') {
+        $('newAnalysisBtn').click();
+      }
+    }
+  });
 
   updateStart();
 })();
