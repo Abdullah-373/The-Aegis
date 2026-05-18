@@ -47,8 +47,8 @@ def test_history_empty():
 
 
 def test_hash_changes_with_model():
-    a = _hash_content("same body", "gemini-1.5-flash")
-    b = _hash_content("same body", "gemini-1.5-pro")
+    a = _hash_content("same body", "gemini-2.5-flash")
+    b = _hash_content("same body", "gemini-2.5-pro")
     assert a != b
 
 
@@ -116,7 +116,7 @@ def test_final_answer_validates_severity():
 
 def test_ws_rejects_missing_key():
     with client.websocket_connect("/ws/analyze") as ws:
-        ws.send_text(json.dumps({"filename": "x.pdf", "model": "gemini-1.5-flash"}))
+        ws.send_text(json.dumps({"filename": "x.pdf", "model": "gemini-2.5-flash"}))
         msg = json.loads(ws.receive_text())
         assert msg["type"] == "fatal"
         assert "key" in msg["message"].lower()

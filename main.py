@@ -31,21 +31,21 @@ from database import SessionLocal, VerdictCache, init_db
 
 MAX_PDF_CHARS = 18_000
 ALLOWED_MODELS = {
-    "gemini-1.5-flash",
-    "gemini-1.5-flash-8b",
-    "gemini-1.5-pro",
     "gemini-2.0-flash",
-    "gemini-2.0-flash-exp",
+    "gemini-2.0-flash-lite",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-pro",
 }
-DEFAULT_MODEL = "gemini-1.5-flash"
+DEFAULT_MODEL = "gemini-2.5-flash"
 
 # Rough USD per 1K tokens. Used only for the UI cost hint.
 MODEL_COST_PER_1K = {
-    "gemini-1.5-flash": 0.0002,
-    "gemini-1.5-flash-8b": 0.0001,
-    "gemini-1.5-pro": 0.003,
     "gemini-2.0-flash": 0.0002,
-    "gemini-2.0-flash-exp": 0.0002,
+    "gemini-2.0-flash-lite": 0.0001,
+    "gemini-2.5-flash": 0.0003,
+    "gemini-2.5-flash-lite": 0.0001,
+    "gemini-2.5-pro": 0.005,
 }
 
 # Human-friendly names for the three helpers.
