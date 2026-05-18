@@ -3,330 +3,296 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>The Aegis :: Three Helpers Check Your PDF</title>
+<title>The Aegis — Document Risk Analysis</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+          mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+        },
+        colors: {
+          ink: {
+            900: '#0b1220', 800: '#1a2236', 700: '#2a3349',
+            600: '#475569', 500: '#64748b', 400: '#94a3b8',
+            300: '#cbd5e1', 200: '#e2e8f0', 100: '#f1f5f9', 50: '#f8fafc',
+          },
+        },
+      },
+    },
+  };
+</script>
 <style>
-  :root {
-    --bg: #0a0a0a;
-    --panel: rgba(18, 18, 22, 0.55);
-    --panel-strong: rgba(22, 22, 28, 0.78);
-    --border: rgba(255, 255, 255, 0.06);
-    --cyan: #00e5ff;
-    --amber: #ffb020;
-    --rose: #ff3860;
-    --green: #34f7a1;
-    --violet: #b388ff;
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: #f7f8fb;
+    color: #0b1220;
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
   }
-  html, body { background: var(--bg); color: #e7e9ee; font-family: 'Inter', system-ui, sans-serif; }
-  .font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  .font-mono { font-family: 'JetBrains Mono', monospace; }
 
-  body::before {
-    content: ""; position: fixed; inset: 0; z-index: -2;
-    background:
-      radial-gradient(1100px 700px at 12% -10%, rgba(0,229,255,0.10), transparent 60%),
-      radial-gradient(900px 600px at 110% 10%, rgba(179,136,255,0.10), transparent 60%),
-      radial-gradient(800px 500px at 50% 120%, rgba(255,56,96,0.08), transparent 60%),
-      #050507;
+  /* View transitions */
+  .view { display: none; opacity: 0; transform: translateY(8px); transition: opacity .35s ease, transform .35s ease; }
+  .view.active { display: block; opacity: 1; transform: translateY(0); }
+
+  /* Card */
+  .card { background: #fff; border: 1px solid #e6e8ee; border-radius: 16px; }
+  .card-soft { background: #fff; border: 1px solid #eceef3; border-radius: 14px; }
+  .ring-focus { transition: box-shadow .15s, border-color .15s; }
+  .ring-focus:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 4px rgba(99,102,241,0.12); }
+
+  /* Drop zone */
+  .drop { transition: border-color .2s, background .2s, transform .2s; }
+  .drop.drag { border-color: #6366f1; background: #eef2ff; }
+
+  /* Primary button */
+  .btn-primary {
+    background: #4f46e5; color: #fff;
+    transition: background .15s, transform .1s, box-shadow .2s;
+    box-shadow: 0 1px 2px rgba(15,23,42,.06), 0 0 0 1px rgba(79,70,229,0.0) inset;
   }
-  body::after {
-    content: ""; position: fixed; inset: 0; z-index: -1;
-    background-image:
-      linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
-    background-size: 44px 44px;
-    mask-image: radial-gradient(ellipse at center, black 50%, transparent 100%);
+  .btn-primary:hover:not(:disabled) { background: #4338ca; box-shadow: 0 6px 20px -8px rgba(79,70,229,0.6); }
+  .btn-primary:active:not(:disabled) { transform: translateY(1px); }
+  .btn-primary:disabled { background: #c7cad3; cursor: not-allowed; box-shadow: none; }
+
+  /* Secondary button */
+  .btn-secondary {
+    background: #fff; color: #0b1220; border: 1px solid #d6dae2;
+    transition: background .15s, border-color .15s;
   }
+  .btn-secondary:hover { background: #f6f7fa; border-color: #b9bfca; }
 
-  .glass {
-    background: var(--panel);
-    backdrop-filter: blur(18px) saturate(140%);
-    -webkit-backdrop-filter: blur(18px) saturate(140%);
-    border: 1px solid var(--border);
-    box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 30px 80px -30px rgba(0,0,0,0.85);
-  }
-  .glass-strong {
-    background: var(--panel-strong);
-    backdrop-filter: blur(22px) saturate(160%);
-    border: 1px solid rgba(255,255,255,0.08);
-  }
-
-  .title-grad { background: linear-gradient(180deg, #ffffff 0%, #b8c0ce 60%, #6b7280 100%);
-    -webkit-background-clip: text; background-clip: text; color: transparent; }
-  .accent-grad { background: linear-gradient(90deg, #00e5ff 0%, #b388ff 100%);
-    -webkit-background-clip: text; background-clip: text; color: transparent; }
-
-  .deploy-btn {
-    position: relative; overflow: hidden;
-    background: linear-gradient(135deg, #00e5ff 0%, #6c8cff 50%, #b388ff 100%);
-    color: #0a0a0a;
-    transition: transform .15s ease, filter .2s ease;
-    box-shadow: 0 10px 40px -10px rgba(0,229,255,0.55), 0 0 0 1px rgba(255,255,255,0.15) inset;
-  }
-  .deploy-btn:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.08); }
-  .deploy-btn:disabled { opacity: .55; cursor: not-allowed; filter: grayscale(.4); }
-  .deploy-btn .shine {
-    position: absolute; top: 0; left: -120%; width: 60%; height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent);
-    transform: skewX(-20deg); animation: shine 3.4s ease-in-out infinite;
-  }
-  @keyframes shine { 0% { left: -120%; } 60% { left: 220%; } 100% { left: 220%; } }
-
-  .drop-zone { transition: border-color .2s ease, background .2s ease, transform .2s ease; }
-  .drop-zone.drag { border-color: var(--cyan); background: rgba(0,229,255,0.05); transform: scale(1.01); }
-
-  .pulse-dot { width: 8px; height: 8px; border-radius: 999px; display: inline-block; }
-  .pulse-dot.live { background: var(--green); box-shadow: 0 0 12px var(--green); animation: pulse 1.4s infinite; }
-  .pulse-dot.idle { background: #444; }
-  .pulse-dot.err  { background: var(--rose); box-shadow: 0 0 10px var(--rose); }
-  @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.35 } }
-
-  .terminal {
-    background:
-      linear-gradient(180deg, rgba(0,0,0,0.55), rgba(0,0,0,0.78)),
-      repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0 1px, transparent 1px 3px);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 14px;
-  }
-  .helper-stream {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 12.5px; line-height: 1.55;
-    white-space: pre-wrap; word-break: break-word;
-  }
-  .alex-color { color: #34f7a1; }
-  .sam-color  { color: #ff5577; }
-  .maya-color { color: #ffd166; }
-  .alex-border { border-color: rgba(52,247,161,0.35); }
-  .sam-border  { border-color: rgba(255,85,119,0.35); }
-  .maya-border { border-color: rgba(255,209,102,0.35); }
-
-  .helper-header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 10px 14px;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .14em;
-    text-transform: uppercase;
-  }
-
-  .scan { position: relative; overflow: hidden; }
-  .scan::before {
-    content: ""; position: absolute; left: 0; right: 0; height: 2px; top: 0;
-    background: linear-gradient(90deg, transparent, rgba(0,229,255,.55), transparent);
-    animation: scanline 2.2s linear infinite; pointer-events: none;
-  }
-  @keyframes scanline { 0% { top: -2px } 100% { top: 100% } }
-
-  .cursor::after { content: "▍"; display: inline-block; margin-left: 2px; opacity: .8; animation: blink 1s steps(1) infinite; }
-  @keyframes blink { 50% { opacity: 0 } }
-
-  .verdict-card { background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
-    border: 1px solid rgba(255,255,255,0.08); }
-  .verdict-go    { border-color: rgba(52,247,161,0.5); box-shadow: 0 0 60px -20px var(--green); }
-  .verdict-nogo  { border-color: rgba(255,56,96,0.55); box-shadow: 0 0 60px -20px var(--rose); }
-  .verdict-cond  { border-color: rgba(255,176,32,0.55); box-shadow: 0 0 60px -20px var(--amber); }
-
-  .scroller::-webkit-scrollbar { width: 10px; height: 10px; }
-  .scroller::-webkit-scrollbar-track { background: transparent; }
-  .scroller::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
-  .scroller::-webkit-scrollbar-thumb:hover { background: rgba(0,229,255,0.35); background-clip: content-box; }
-
-  .chip {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 4px 10px; border-radius: 999px;
-    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .12em;
-    text-transform: uppercase; border: 1px solid rgba(255,255,255,0.08);
-    background: rgba(255,255,255,0.03); cursor: default;
-  }
-  .chip.clickable { cursor: pointer; transition: color .15s, border-color .15s; }
-  .chip.clickable:hover { color: var(--cyan); border-color: rgba(0,229,255,0.4); }
-
-  .key-input, .select-input {
-    background: rgba(0,0,0,0.55);
-    border: 1px solid rgba(255,255,255,0.08);
-    color: #e7e9ee;
-  }
-  .key-input { font-family: 'JetBrains Mono', monospace; letter-spacing: .15em; }
-  .key-input:focus, .select-input:focus { outline: none; border-color: var(--cyan); box-shadow: 0 0 0 4px rgba(0,229,255,0.08); }
-
-  .helper-card { transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease; }
-  .helper-card.active { transform: translateY(-2px); }
-  .helper-card.active.alex-border { box-shadow: 0 0 40px -15px #34f7a1; }
-  .helper-card.active.sam-border  { box-shadow: 0 0 40px -15px #ff5577; }
-  .helper-card.active.maya-border { box-shadow: 0 0 40px -15px #ffd166; }
-
-  .toggle { position: relative; width: 36px; height: 20px; }
+  /* Toggle switch */
+  .toggle { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
   .toggle input { display: none; }
   .toggle .slider {
-    position: absolute; inset: 0; background: rgba(255,255,255,0.08);
-    border-radius: 999px; transition: background .2s;
+    position: absolute; inset: 0; background: #d6dae2; border-radius: 999px; transition: background .2s;
+    cursor: pointer;
   }
   .toggle .slider::before {
     content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
-    background: #e7e9ee; border-radius: 50%; transition: transform .2s;
+    background: #fff; border-radius: 50%; transition: transform .2s;
+    box-shadow: 0 1px 2px rgba(15,23,42,.15);
   }
-  .toggle input:checked + .slider { background: var(--cyan); }
-  .toggle input:checked + .slider::before { transform: translateX(16px); background: #0a0a0a; }
+  .toggle input:checked + .slider { background: #4f46e5; }
+  .toggle input:checked + .slider::before { transform: translateX(16px); }
 
-  .gauge-track { stroke: rgba(255,255,255,0.08); }
-  .gauge-fill { transition: stroke-dashoffset .9s cubic-bezier(.2,.7,.2,1), stroke .6s; }
+  /* Progress strip */
+  .step { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 12px; transition: background .2s, border-color .2s; border: 1px solid transparent; }
+  .step .dot { width: 8px; height: 8px; border-radius: 50%; background: #cbd5e1; transition: background .2s, box-shadow .2s; flex-shrink: 0; }
+  .step.active { background: #eef2ff; border-color: #c7d2fe; }
+  .step.active .dot { background: #4f46e5; box-shadow: 0 0 0 4px rgba(79,70,229,.15); animation: pulse 1.6s ease-in-out infinite; }
+  .step.done .dot { background: #10b981; }
+  .step.done { background: #f0fdf4; border-color: #d1fae5; }
+  @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .5 } }
 
-  .toast {
-    position: fixed; right: 22px; bottom: 22px; z-index: 80;
-    min-width: 260px; max-width: 380px;
-    padding: 12px 14px; border-radius: 12px;
-    background: rgba(20,20,26,0.92); backdrop-filter: blur(14px);
-    border: 1px solid rgba(255,255,255,0.08); color: #e7e9ee;
-    font-size: 12.5px; font-family: 'JetBrains Mono', monospace;
-    transform: translateY(120%); opacity: 0; transition: all .3s cubic-bezier(.2,.7,.2,1);
+  /* Agent card states */
+  .agent-card { transition: border-color .25s, box-shadow .25s, transform .25s; }
+  .agent-card.streaming { border-color: #c7d2fe; box-shadow: 0 1px 2px rgba(15,23,42,.04), 0 8px 28px -12px rgba(79,70,229,.25); }
+  .agent-card.done { border-color: #d1fae5; }
+
+  /* Stream area */
+  .stream {
+    font-size: 14px; line-height: 1.65; color: #1f2a44; max-height: 460px; overflow-y: auto; padding: 18px 20px;
   }
-  .toast.show { transform: translateY(0); opacity: 1; }
-  .toast.error { border-color: rgba(255,56,96,0.5); box-shadow: 0 0 30px -10px var(--rose); }
-  .toast.warn { border-color: rgba(255,176,32,0.5); box-shadow: 0 0 30px -10px var(--amber); }
-  .toast.ok { border-color: rgba(52,247,161,0.5); box-shadow: 0 0 30px -10px var(--green); }
+  .stream::-webkit-scrollbar { width: 6px; }
+  .stream::-webkit-scrollbar-thumb { background: #d6dae2; border-radius: 999px; }
+  .stream p { margin: 0 0 10px; }
+  .stream ul, .stream ol { margin: 0 0 10px 18px; }
+  .stream li { margin-bottom: 4px; }
+  .stream strong { color: #0b1220; font-weight: 600; }
+  .stream em { font-style: italic; color: #2a3349; }
+  .stream h2, .stream h3 { font-size: 14px; font-weight: 700; color: #0b1220; margin: 14px 0 6px; }
+  .stream code { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; background: #f1f5f9; padding: 1px 6px; border-radius: 4px; color: #334155; }
+  .stream pre { display: none; }  /* Hide JSON code blocks from agent transcripts */
+  .stream-placeholder { color: #94a3b8; font-style: italic; font-size: 13.5px; padding: 18px 20px; }
 
+  .cursor::after {
+    content: "|"; display: inline-block; margin-left: 1px; color: #6366f1;
+    animation: blink .9s steps(1) infinite; font-weight: 400;
+  }
+  @keyframes blink { 50% { opacity: 0 } }
+
+  /* Gauge ring */
+  .gauge-track { stroke: #eef0f5; }
+  .gauge-fill { transition: stroke-dashoffset 1s cubic-bezier(.2,.7,.2,1), stroke .6s; }
+
+  /* Verdict word styling */
+  .verdict-go { color: #047857; }
+  .verdict-nogo { color: #b91c1c; }
+  .verdict-cond { color: #b45309; }
+
+  /* Severity pills */
+  .pill { display:inline-flex; align-items:center; padding: 3px 9px; border-radius: 999px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; border: 1px solid; }
+  .pill-low  { color: #047857; background: #ecfdf5; border-color: #a7f3d0; }
+  .pill-med  { color: #b45309; background: #fffbeb; border-color: #fcd34d; }
+  .pill-high { color: #b91c1c; background: #fef2f2; border-color: #fca5a5; }
+  .pill-info { color: #3730a3; background: #eef2ff; border-color: #c7d2fe; }
+  .pill-success { color: #047857; background: #ecfdf5; border-color: #a7f3d0; }
+  .pill-warn { color: #b45309; background: #fffbeb; border-color: #fcd34d; }
+  .pill-error { color: #b91c1c; background: #fef2f2; border-color: #fca5a5; }
+  .pill-neutral { color: #475569; background: #f8fafc; border-color: #e2e8f0; }
+
+  /* Risk gauge container */
+  .gauge-wrap { position: relative; width: 168px; height: 168px; flex-shrink: 0; }
+
+  /* Hero verdict tile */
+  .verdict-tile {
+    background:
+      radial-gradient(800px 220px at 100% 0, rgba(99,102,241,0.06), transparent 60%),
+      linear-gradient(180deg, #ffffff, #fbfcfe);
+    border: 1px solid #e6e8ee; border-radius: 24px;
+    box-shadow: 0 1px 2px rgba(15,23,42,.04), 0 20px 60px -30px rgba(15,23,42,.18);
+  }
+
+  /* Hero verdict accent */
+  .verdict-tile.is-go    { background: linear-gradient(180deg, #fff, #f0fdf6); border-color: #bbf7d0; }
+  .verdict-tile.is-nogo  { background: linear-gradient(180deg, #fff, #fef4f4); border-color: #fecaca; }
+  .verdict-tile.is-cond  { background: linear-gradient(180deg, #fff, #fffbf2); border-color: #fde68a; }
+
+  /* Drawer */
   .drawer { transform: translateX(110%); transition: transform .35s cubic-bezier(.2,.7,.2,1); }
   .drawer.open { transform: translateX(0); }
   .drawer-backdrop { opacity: 0; pointer-events: none; transition: opacity .3s; }
   .drawer-backdrop.open { opacity: 1; pointer-events: auto; }
 
-  .risk-row { transition: background .15s; }
-  .risk-row:hover { background: rgba(255,255,255,0.025); }
-  .sev-low  { color: #34f7a1; border-color: rgba(52,247,161,0.4); background: rgba(52,247,161,0.08); }
-  .sev-med  { color: #ffb020; border-color: rgba(255,176,32,0.4); background: rgba(255,176,32,0.08); }
-  .sev-high { color: #ff5577; border-color: rgba(255,85,119,0.4); background: rgba(255,85,119,0.08); }
-  .sev-badge { display:inline-block; padding: 2px 8px; border-radius: 999px; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .1em; border: 1px solid; text-transform: uppercase; }
+  /* Toast */
+  .toast {
+    position: fixed; right: 22px; bottom: 22px; z-index: 80;
+    min-width: 260px; max-width: 380px;
+    padding: 12px 14px; border-radius: 12px;
+    background: #fff; border: 1px solid #e6e8ee;
+    color: #0b1220; font-size: 13.5px;
+    box-shadow: 0 1px 2px rgba(15,23,42,.04), 0 16px 40px -16px rgba(15,23,42,.2);
+    transform: translateY(120%); opacity: 0; transition: all .3s cubic-bezier(.2,.7,.2,1);
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.error { border-color: #fecaca; }
+  .toast.warn  { border-color: #fde68a; }
+  .toast.ok    { border-color: #bbf7d0; }
 
-  .hist-card { transition: border-color .2s, transform .2s; cursor: pointer; }
-  .hist-card:hover { border-color: rgba(0,229,255,0.35); transform: translateY(-2px); }
+  /* Modal-like skeleton lines */
+  .skel { background: linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%); background-size: 200% 100%; animation: shine 1.4s linear infinite; border-radius: 6px; }
+  @keyframes shine { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
 </style>
 </head>
 <body class="min-h-screen">
 
-<!-- TOP BAR -->
-<header class="sticky top-0 z-40 glass-strong border-b border-white/5">
-  <div class="max-w-[1480px] mx-auto px-6 py-3 flex items-center justify-between">
+<!-- ================== HEADER ================== -->
+<header class="bg-white border-b border-ink-200/80">
+  <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
     <div class="flex items-center gap-3">
-      <div class="w-9 h-9 rounded-lg flex items-center justify-center"
-           style="background: linear-gradient(135deg, #00e5ff, #b388ff); box-shadow: 0 0 24px -6px #00e5ff;">
-        <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="#0a0a0a" stroke-width="2.2">
+      <div class="w-9 h-9 rounded-lg flex items-center justify-center bg-indigo-600">
+        <svg viewBox="0 0 24 24" class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2.2">
           <path d="M12 2 4 5v7c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V5l-8-3Z"/>
         </svg>
       </div>
       <div>
-        <div class="text-[10px] font-mono tracking-[0.28em] text-white/40">SAFE · SIMPLE · FAST</div>
-        <div class="text-lg font-extrabold tracking-tight">THE AEGIS<span class="accent-grad"> ::</span> Three Helpers</div>
+        <div class="text-[15px] font-semibold tracking-tight">The Aegis</div>
+        <div class="text-[11px] text-ink-500">Document Risk Analysis</div>
       </div>
     </div>
-    <div class="hidden md:flex items-center gap-2 text-xs font-mono text-white/60">
-      <span class="chip"><span class="pulse-dot live"></span> ONLINE</span>
-      <span class="chip">YOUR KEY ONLY</span>
-      <button id="openHistory" class="chip clickable">PAST CHECKS</button>
+    <div class="flex items-center gap-2">
+      <span id="headerModel" class="hidden pill pill-info">gemini-2.5-flash</span>
+      <button id="openHistory" class="btn-secondary text-sm px-3 py-1.5 rounded-lg font-medium">
+        <span class="inline-flex items-center gap-1.5">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Past Reports
+        </span>
+      </button>
     </div>
   </div>
 </header>
 
-<main class="max-w-[1480px] mx-auto px-6 py-10">
+<main class="max-w-7xl mx-auto px-6 py-10">
 
-  <!-- HERO -->
-  <section class="mb-10">
-    <div class="flex items-center gap-2 mb-3">
-      <span class="chip"><span class="pulse-dot live"></span> LIVE</span>
-      <span class="chip">THREE HELPERS</span>
-      <span class="chip">CLEAR ANSWER</span>
-      <span class="chip">YOUR KEY STAYS WITH YOU</span>
-    </div>
-    <h1 class="text-5xl md:text-6xl font-extrabold leading-[1.05] tracking-tight title-grad">
-      Three helpers.<br/>
-      <span class="accent-grad">One clear answer.</span>
-    </h1>
-    <p class="mt-4 max-w-2xl text-white/60 text-[15px] leading-relaxed">
-      Send a PDF. Three AI helpers talk about it live: <span class="text-emerald-300 font-semibold">Alex</span> finds the good points,
-      <span class="text-rose-300 font-semibold">Sam</span> finds the problems, and <span class="text-amber-300 font-semibold">Maya</span> gives the
-      final answer — <span class="font-mono text-white/90">YES</span>, <span class="font-mono text-white/90">NO</span>, or <span class="font-mono text-white/90">MAYBE</span> with rules.
-      Same file next time? You get the answer at once.
-    </p>
-  </section>
+  <!-- ============================================================== -->
+  <!-- VIEW 1: SETUP & UPLOAD                                          -->
+  <!-- ============================================================== -->
+  <section id="view-setup" class="view active">
+    <div class="max-w-2xl mx-auto">
+      <div class="text-center mb-8">
+        <span class="pill pill-info mb-4">New analysis</span>
+        <h1 class="text-3xl md:text-4xl font-bold tracking-tight mt-3">Run a risk analysis</h1>
+        <p class="text-ink-600 mt-3 max-w-md mx-auto">
+          Three specialised agents will review your document and return a structured verdict with a risk score and a mitigation matrix.
+        </p>
+      </div>
 
-  <div class="grid grid-cols-12 gap-6">
+      <div class="card p-7 md:p-8 space-y-7">
 
-    <!-- LEFT: CONTROL -->
-    <aside class="col-span-12 lg:col-span-4">
-      <div class="glass rounded-2xl p-6">
-        <div class="flex items-center justify-between mb-5">
-          <div>
-            <div class="text-[10px] font-mono tracking-[0.24em] text-white/40">// SETUP</div>
-            <h2 class="text-xl font-bold mt-1">Start a Check</h2>
-          </div>
-          <div class="text-[10px] font-mono text-white/40">SAFE LINK</div>
-        </div>
-
-        <!-- API KEY -->
-        <label class="block">
+        <!-- API Key -->
+        <div>
           <div class="flex items-center justify-between mb-2">
-            <span class="text-sm font-semibold tracking-wide flex items-center gap-2">
-              <svg class="w-4 h-4 text-cyan-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2 13 10"/><path d="m17 6 4 4"/><circle cx="9" cy="15" r="6"/></svg>
-              Your Gemini API Key
-              <span class="chip" style="border-color: rgba(0,229,255,0.4); color: #9ef0ff;">YOUR KEY</span>
-            </span>
-            <button type="button" id="toggleKey" class="text-[11px] font-mono text-white/50 hover:text-cyan-300 transition">SHOW</button>
+            <label class="text-sm font-semibold text-ink-900">Gemini API Key</label>
+            <button type="button" id="toggleKey" class="text-xs font-medium text-ink-500 hover:text-indigo-600 transition">Show</button>
           </div>
           <div class="relative">
             <input id="apiKey" type="password" autocomplete="off" spellcheck="false"
-                   placeholder="AIza••••••••••••••••••••••••••••••"
-                   class="key-input w-full rounded-xl px-4 py-3 pr-10 text-sm"/>
-            <span class="absolute right-3 top-1/2 -translate-y-1/2 pulse-dot idle" id="keyDot"></span>
+              placeholder="AIza..."
+              class="ring-focus w-full bg-white border border-ink-200 rounded-xl px-4 py-2.5 text-sm font-mono pr-10" />
+            <span id="keyDot" class="absolute right-3 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-ink-300 transition"></span>
           </div>
-          <p class="mt-2 text-[11px] text-white/40 font-mono">We never save it. We only use it for this one check.</p>
-        </label>
+          <p class="text-xs text-ink-500 mt-2">Used only for this request. Never stored, never logged.</p>
+        </div>
 
-        <!-- MODEL PICKER -->
-        <label class="block mt-5">
-          <span class="text-sm font-semibold tracking-wide flex items-center gap-2 mb-2">
-            <svg class="w-4 h-4 text-violet-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/></svg>
-            Pick a Model
-          </span>
-          <select id="modelSelect" class="select-input w-full rounded-xl px-3 py-2.5 text-sm font-mono">
-            {% for m in models %}
-              <option value="{{ m }}" {% if m == default_model %}selected{% endif %}>{{ m }}</option>
-            {% endfor %}
-          </select>
-          <p class="mt-2 text-[11px] text-white/40 font-mono">Flash is fast and cheap. Pro is slower but smarter.</p>
-        </label>
-
-        <!-- FILE -->
-        <div class="mt-5">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-sm font-semibold tracking-wide flex items-center gap-2">
-              <svg class="w-4 h-4 text-violet-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
-              Your PDF
-            </span>
-            <span id="fileChip" class="chip hidden">FILE READY</span>
+        <!-- Model -->
+        <div>
+          <label class="text-sm font-semibold text-ink-900 mb-2 block">Model</label>
+          <div class="relative">
+            <select id="modelSelect" class="ring-focus w-full appearance-none bg-white border border-ink-200 rounded-xl px-4 py-2.5 text-sm pr-9">
+              {% for m in models %}
+                <option value="{{ m }}" {% if m == default_model %}selected{% endif %}>{{ m }}</option>
+              {% endfor %}
+            </select>
+            <svg class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
           </div>
+          <p class="text-xs text-ink-500 mt-2">Flash is fast and cheap. Pro is slower but more thorough.</p>
+        </div>
 
+        <!-- File -->
+        <div>
+          <label class="text-sm font-semibold text-ink-900 mb-2 block">Document</label>
           <label id="dropZone" for="pdfFile"
-                 class="drop-zone block rounded-xl border border-dashed border-white/15 bg-white/[0.02]
-                        px-4 py-7 text-center cursor-pointer hover:border-cyan-400/40">
-            <div class="flex flex-col items-center gap-3">
-              <div class="w-12 h-12 rounded-xl flex items-center justify-center"
-                   style="background: rgba(0,229,255,0.07); border: 1px solid rgba(0,229,255,0.25);">
-                <svg class="w-6 h-6 text-cyan-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8 12 3 7 8"/><path d="M12 3v12"/>
-                </svg>
+            class="drop block bg-ink-50 border-2 border-dashed border-ink-200 rounded-xl px-4 py-8 text-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/30">
+            <div id="dropEmpty" class="flex flex-col items-center gap-3">
+              <div class="w-11 h-11 rounded-lg bg-white border border-ink-200 flex items-center justify-center">
+                <svg class="w-5 h-5 text-ink-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8 12 3 7 8"/><path d="M12 3v12"/></svg>
               </div>
               <div>
-                <div class="text-sm font-semibold">Drop your PDF here</div>
-                <div class="text-[11px] text-white/40 font-mono mt-1" id="fileLabel">or click to choose a file (about 5 MB max)</div>
+                <div class="text-sm font-medium text-ink-900">Drop a PDF here, or click to browse</div>
+                <div class="text-xs text-ink-500 mt-1">PDF only · up to ~5 MB</div>
               </div>
+            </div>
+            <div id="dropFilled" class="hidden flex items-center gap-3 text-left">
+              <div class="w-10 h-10 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center">
+                <svg class="w-5 h-5 text-indigo-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div id="fileName" class="text-sm font-medium text-ink-900 truncate"></div>
+                <div id="fileSize" class="text-xs text-ink-500"></div>
+              </div>
+              <button type="button" id="fileClear" class="text-ink-400 hover:text-ink-700 transition p-1">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+              </button>
             </div>
             <input id="pdfFile" type="file" accept="application/pdf" class="hidden"/>
           </label>
         </div>
 
-        <!-- FORCE TOGGLE -->
-        <div class="mt-5 flex items-center justify-between">
+        <!-- Force re-run -->
+        <div class="flex items-center justify-between border-t border-ink-100 pt-5">
           <div>
-            <div class="text-sm font-semibold">Run again (skip cache)</div>
-            <div class="text-[11px] text-white/40 font-mono">do a fresh check, even if we have one saved</div>
+            <div class="text-sm font-medium text-ink-900">Force re-analyze</div>
+            <div class="text-xs text-ink-500 mt-0.5">Skip the cache and re-run all three agents.</div>
           </div>
           <label class="toggle">
             <input id="forceToggle" type="checkbox"/>
@@ -334,574 +300,825 @@
           </label>
         </div>
 
-        <!-- DEPLOY / CANCEL -->
-        <div class="mt-5 flex gap-2">
-          <button id="deployBtn" disabled
-                  class="deploy-btn flex-1 rounded-xl py-3.5 font-extrabold tracking-[0.18em] text-sm">
-            <span class="shine"></span>
-            START THE CHECK
-          </button>
-          <button id="cancelBtn" disabled
-                  class="rounded-xl px-4 py-3.5 text-sm font-mono tracking-wider border border-white/10 bg-white/[0.02] hover:border-rose-400/50 hover:text-rose-300 disabled:opacity-30 disabled:cursor-not-allowed transition">
-            STOP
-          </button>
-        </div>
+        <!-- CTA -->
+        <button id="startBtn" disabled
+          class="btn-primary w-full rounded-xl py-3 font-semibold text-sm tracking-wide">
+          Start analysis
+        </button>
+      </div>
+    </div>
+  </section>
 
-        <!-- STATUS -->
-        <div class="mt-5 grid grid-cols-2 gap-2 text-[11px] font-mono">
-          <div class="flex items-center gap-2 text-white/60">
-            <span id="statusDot" class="pulse-dot idle"></span>
-            <span id="statusText" class="truncate">READY</span>
-          </div>
-          <div class="flex items-center justify-end gap-3 text-white/40">
-            <span title="time">⏱ <span id="timer">00.00s</span></span>
-            <span title="words used (about)">⌬ <span id="tokenMeter">0</span></span>
-          </div>
+  <!-- ============================================================== -->
+  <!-- VIEW 2: LIVE ANALYSIS                                           -->
+  <!-- ============================================================== -->
+  <section id="view-analysis" class="view">
+    <div class="flex items-start justify-between gap-4 mb-6">
+      <div>
+        <span class="pill pill-info">In progress</span>
+        <h1 class="text-2xl md:text-3xl font-bold tracking-tight mt-3">Tribunal in session</h1>
+        <p class="text-ink-600 mt-2 text-sm" id="analysisSubtitle">Three agents are reviewing your document. Each one streams its findings in real time.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="text-right hidden md:block">
+          <div class="text-[11px] uppercase tracking-wider text-ink-400 font-medium">Elapsed</div>
+          <div class="font-mono text-sm font-semibold text-ink-900"><span id="timer">00.00s</span></div>
+        </div>
+        <button id="cancelBtn" class="btn-secondary text-sm px-3 py-1.5 rounded-lg font-medium">
+          <span class="inline-flex items-center gap-1.5">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+            Cancel
+          </span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Progress strip -->
+    <div class="card p-2 mb-6 grid grid-cols-1 md:grid-cols-3 gap-1">
+      <div id="step-alex" class="step">
+        <span class="dot"></span>
+        <div>
+          <div class="text-[11px] uppercase tracking-wider text-ink-400 font-medium">Step 1</div>
+          <div class="text-sm font-semibold">Strategist review</div>
         </div>
       </div>
-
-      <!-- MEET THE HELPERS -->
-      <div class="glass rounded-2xl p-5 mt-6">
-        <div class="text-[10px] font-mono tracking-[0.24em] text-white/40 mb-3">// MEET THE HELPERS</div>
-        <ul class="space-y-2 text-sm">
-          <li class="flex items-center gap-3"><span class="w-2 h-2 rounded-full" style="background:#34f7a1; box-shadow:0 0 10px #34f7a1"></span> <span class="font-semibold">Alex</span> <span class="text-white/40 text-xs">— finds the good points</span></li>
-          <li class="flex items-center gap-3"><span class="w-2 h-2 rounded-full" style="background:#ff5577; box-shadow:0 0 10px #ff5577"></span> <span class="font-semibold">Sam</span> <span class="text-white/40 text-xs">— finds the problems</span></li>
-          <li class="flex items-center gap-3"><span class="w-2 h-2 rounded-full" style="background:#ffd166; box-shadow:0 0 10px #ffd166"></span> <span class="font-semibold">Maya</span> <span class="text-white/40 text-xs">— makes the choice</span></li>
-        </ul>
+      <div id="step-sam" class="step">
+        <span class="dot"></span>
+        <div>
+          <div class="text-[11px] uppercase tracking-wider text-ink-400 font-medium">Step 2</div>
+          <div class="text-sm font-semibold">Red team rebuttal</div>
+        </div>
       </div>
-    </aside>
+      <div id="step-maya" class="step">
+        <span class="dot"></span>
+        <div>
+          <div class="text-[11px] uppercase tracking-wider text-ink-400 font-medium">Step 3</div>
+          <div class="text-sm font-semibold">Judge ruling</div>
+        </div>
+      </div>
+    </div>
 
-    <!-- RIGHT: LIVE TERMINAL -->
-    <section class="col-span-12 lg:col-span-8">
-      <div class="glass rounded-2xl p-5">
+    <!-- Agent cards -->
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-5">
+      <!-- Alex / Strategist -->
+      <article id="card-alex" class="agent-card card overflow-hidden">
+        <div class="px-5 pt-5 pb-4 border-b border-ink-100">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700 font-semibold text-sm">A</div>
+              <div>
+                <div class="text-[15px] font-semibold leading-tight">Alex</div>
+                <div class="text-[11px] uppercase tracking-wider text-ink-500 font-medium">Strategist</div>
+              </div>
+            </div>
+            <span id="t-alex" class="pill pill-neutral">Waiting</span>
+          </div>
+          <p class="text-xs text-ink-500 mt-3">Looks at the upside: business value, growth, competitive advantage.</p>
+        </div>
+        <div id="stream-alex" class="stream">
+          <div class="stream-placeholder">Awaiting deployment…</div>
+        </div>
+        <div class="px-5 py-3 border-t border-ink-100 flex items-center justify-between text-xs text-ink-500">
+          <span>Output</span>
+          <span class="font-mono"><span id="words-alex">0</span> words</span>
+        </div>
+      </article>
 
-        <div class="flex items-center justify-between mb-4">
-          <div class="flex items-center gap-3">
-            <span class="flex gap-1.5">
-              <span class="w-2.5 h-2.5 rounded-full bg-[#ff5f56]"></span>
-              <span class="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]"></span>
-              <span class="w-2.5 h-2.5 rounded-full bg-[#27c93f]"></span>
+      <!-- Sam / Red Team -->
+      <article id="card-sam" class="agent-card card overflow-hidden">
+        <div class="px-5 pt-5 pb-4 border-b border-ink-100">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-700 font-semibold text-sm">S</div>
+              <div>
+                <div class="text-[15px] font-semibold leading-tight">Sam</div>
+                <div class="text-[11px] uppercase tracking-wider text-ink-500 font-medium">Red Team</div>
+              </div>
+            </div>
+            <span id="t-sam" class="pill pill-neutral">Waiting</span>
+          </div>
+          <p class="text-xs text-ink-500 mt-3">Attacks the deal: hidden traps, legal exposure, worst-case scenarios.</p>
+        </div>
+        <div id="stream-sam" class="stream">
+          <div class="stream-placeholder">Waiting for Strategist to finish…</div>
+        </div>
+        <div class="px-5 py-3 border-t border-ink-100 flex items-center justify-between text-xs text-ink-500">
+          <span>Output</span>
+          <span class="font-mono"><span id="words-sam">0</span> words</span>
+        </div>
+      </article>
+
+      <!-- Maya / Judge -->
+      <article id="card-maya" class="agent-card card overflow-hidden">
+        <div class="px-5 pt-5 pb-4 border-b border-ink-100">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-700 font-semibold text-sm">M</div>
+              <div>
+                <div class="text-[15px] font-semibold leading-tight">Maya</div>
+                <div class="text-[11px] uppercase tracking-wider text-ink-500 font-medium">Judge</div>
+              </div>
+            </div>
+            <span id="t-maya" class="pill pill-neutral">Waiting</span>
+          </div>
+          <p class="text-xs text-ink-500 mt-3">Weighs both sides and renders the final structured ruling.</p>
+        </div>
+        <div id="stream-maya" class="stream">
+          <div class="stream-placeholder">Waiting for both arguments…</div>
+        </div>
+        <div class="px-5 py-3 border-t border-ink-100 flex items-center justify-between text-xs text-ink-500">
+          <span>Output</span>
+          <span class="font-mono"><span id="words-maya">0</span> words</span>
+        </div>
+      </article>
+    </div>
+
+    <!-- Footer log -->
+    <div class="mt-6 text-xs text-ink-500 font-mono" id="logTail">
+      <span class="text-ink-400">[system]</span> connecting…
+    </div>
+  </section>
+
+  <!-- ============================================================== -->
+  <!-- VIEW 3: VERDICT DASHBOARD                                       -->
+  <!-- ============================================================== -->
+  <section id="view-verdict" class="view">
+
+    <!-- Hero -->
+    <div id="verdictTile" class="verdict-tile p-7 md:p-10 mb-6">
+      <div class="flex flex-col md:flex-row md:items-center gap-8">
+        <!-- Gauge -->
+        <div class="gauge-wrap">
+          <svg viewBox="0 0 168 168" class="w-full h-full -rotate-90">
+            <circle class="gauge-track" cx="84" cy="84" r="72" stroke-width="14" fill="none"/>
+            <circle id="gaugeFill" class="gauge-fill" cx="84" cy="84" r="72" stroke-width="14" fill="none"
+              stroke-linecap="round" stroke="#10b981" stroke-dasharray="452.39" stroke-dashoffset="452.39"/>
+          </svg>
+          <div class="absolute inset-0 flex flex-col items-center justify-center">
+            <div class="text-[10px] uppercase tracking-[0.18em] text-ink-400 font-semibold">Risk score</div>
+            <div id="gaugeScore" class="font-mono text-5xl font-bold text-ink-900 leading-none mt-1">0</div>
+            <div class="text-[11px] text-ink-500 mt-1.5"><span id="gaugeBand">low risk</span></div>
+          </div>
+        </div>
+
+        <!-- Verdict + headline -->
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-2 flex-wrap">
+            <span id="verdictBadge" class="pill pill-success">Recommendation</span>
+            <span id="cacheBadge" class="hidden pill pill-info">
+              <svg class="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              From cache · <span id="cacheTime" class="ml-1 font-mono">0.00s</span>
             </span>
-            <div>
-              <div class="text-[10px] font-mono tracking-[0.24em] text-white/40">// LIVE</div>
-              <h2 class="text-lg font-bold">aegis@chat:~$ <span class="accent-grad">talk</span></h2>
-            </div>
+            <span id="truncBadge" class="hidden pill pill-warn">Document truncated</span>
           </div>
-          <div class="flex items-center gap-2">
-            <span id="cacheChip" class="chip hidden" style="border-color: rgba(0,229,255,0.4); color:#9ef0ff;">FROM CACHE • FAST</span>
-            <span id="truncChip" class="chip hidden" style="border-color: rgba(255,176,32,0.5); color:#ffd9a0;">FILE TOO LONG</span>
-            <button id="exportBtn" class="chip clickable hidden">SAVE JSON</button>
-            <button id="clearBtn" class="chip clickable">CLEAR</button>
+          <div class="flex items-baseline gap-3 flex-wrap">
+            <h1 id="verdictText" class="text-5xl md:text-6xl font-extrabold tracking-tight">MAYBE</h1>
           </div>
+          <p id="verdictHeadline" class="text-base md:text-lg text-ink-700 mt-3 leading-relaxed max-w-2xl"></p>
         </div>
 
-        <!-- VERDICT BANNER -->
-        <div id="verdictBanner" class="verdict-card rounded-xl px-5 py-5 mb-5 hidden">
-          <div class="flex items-center gap-6">
-            <!-- Risk gauge -->
-            <div class="relative flex-shrink-0 w-[120px] h-[120px]">
-              <svg viewBox="0 0 120 120" class="w-full h-full -rotate-90">
-                <circle class="gauge-track" cx="60" cy="60" r="52" stroke-width="10" fill="none"/>
-                <circle id="gaugeFill" class="gauge-fill" cx="60" cy="60" r="52" stroke-width="10" fill="none"
-                        stroke-linecap="round" stroke="#34f7a1" stroke-dasharray="326.7" stroke-dashoffset="326.7"/>
-              </svg>
-              <div class="absolute inset-0 flex flex-col items-center justify-center">
-                <div id="gaugeScore" class="text-3xl font-extrabold leading-none">0</div>
-                <div class="text-[9px] font-mono tracking-[0.2em] text-white/40 mt-1">RISK</div>
-              </div>
-            </div>
-
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center justify-between gap-3 mb-1">
-                <div class="text-[10px] font-mono tracking-[0.24em] text-white/40">// FINAL ANSWER</div>
-                <div id="verdictMeta" class="text-[10px] font-mono text-white/40"></div>
-              </div>
-              <div class="flex items-baseline gap-3">
-                <span id="verdictText" class="text-3xl font-extrabold tracking-tight">—</span>
-                <span id="verdictIcon" class="text-2xl"></span>
-              </div>
-              <div id="verdictHeadline" class="mt-2 text-sm text-white/70 leading-snug"></div>
-              <div id="verdictConditions" class="mt-2 text-[12px] font-mono text-amber-200/80 hidden"></div>
-            </div>
+        <!-- Side metrics -->
+        <div class="md:w-44 flex md:flex-col gap-4 md:gap-3 md:border-l md:border-ink-100 md:pl-6">
+          <div class="flex-1 md:flex-none">
+            <div class="text-[10px] uppercase tracking-wider text-ink-400 font-semibold">Time</div>
+            <div class="font-mono text-base font-semibold text-ink-900 mt-1" id="metricTime">—</div>
           </div>
-
-          <!-- RISK TABLE -->
-          <div id="riskMatrixWrap" class="mt-5 hidden">
-            <div class="text-[10px] font-mono tracking-[0.24em] text-white/40 mb-2">// LIST OF RISKS</div>
-            <div class="overflow-x-auto rounded-lg border border-white/5">
-              <table class="w-full text-sm">
-                <thead class="text-[10px] font-mono tracking-[0.18em] text-white/40">
-                  <tr class="bg-white/[0.02]">
-                    <th class="text-left px-3 py-2 font-normal">RISK</th>
-                    <th class="text-left px-3 py-2 font-normal w-[120px]">HOW LIKELY</th>
-                    <th class="text-left px-3 py-2 font-normal w-[120px]">HOW BAD</th>
-                    <th class="text-left px-3 py-2 font-normal">WHAT TO DO</th>
-                  </tr>
-                </thead>
-                <tbody id="riskMatrixBody"></tbody>
-              </table>
-            </div>
+          <div class="flex-1 md:flex-none">
+            <div class="text-[10px] uppercase tracking-wider text-ink-400 font-semibold">Tokens</div>
+            <div class="font-mono text-base font-semibold text-ink-900 mt-1" id="metricTokens">—</div>
           </div>
-        </div>
-
-        <!-- HELPER PANELS -->
-        <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
-          <article id="card-alex" class="helper-card terminal alex-border scan">
-            <header class="helper-header alex-color">
-              <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full" style="background:#34f7a1; box-shadow:0 0 8px #34f7a1"></span>
-                HELPER 1 :: ALEX
-              </div>
-              <span class="text-white/30" id="t-alex">waiting</span>
-            </header>
-            <div class="helper-stream alex-color scroller p-4 h-[420px] overflow-y-auto" id="stream-alex"
-                 data-placeholder="// waiting...
-// Alex will look at the PDF and list the good points.
-"></div>
-          </article>
-
-          <article id="card-sam" class="helper-card terminal sam-border">
-            <header class="helper-header sam-color">
-              <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full" style="background:#ff5577; box-shadow:0 0 8px #ff5577"></span>
-                HELPER 2 :: SAM
-              </div>
-              <span class="text-white/30" id="t-sam">waiting</span>
-            </header>
-            <div class="helper-stream sam-color scroller p-4 h-[420px] overflow-y-auto" id="stream-sam"
-                 data-placeholder="// waiting...
-// Sam will read Alex first, then list the problems.
-"></div>
-          </article>
-
-          <article id="card-maya" class="helper-card terminal maya-border">
-            <header class="helper-header maya-color">
-              <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full" style="background:#ffd166; box-shadow:0 0 8px #ffd166"></span>
-                HELPER 3 :: MAYA
-              </div>
-              <span class="text-white/30" id="t-maya">waiting</span>
-            </header>
-            <div class="helper-stream maya-color scroller p-4 h-[420px] overflow-y-auto" id="stream-maya"
-                 data-placeholder="// waiting for Alex and Sam to finish.
-// Then Maya gives the answer with a JSON block.
-"></div>
-          </article>
-        </div>
-
-        <div class="mt-4 font-mono text-[11px] text-white/40" id="logTail">
-          <span class="text-white/30">[info]</span> ready. Add your key and a PDF to start.
+          <div class="flex-1 md:flex-none">
+            <div class="text-[10px] uppercase tracking-wider text-ink-400 font-semibold">Cost</div>
+            <div class="font-mono text-base font-semibold text-ink-900 mt-1" id="metricCost">—</div>
+          </div>
+          <div class="flex-1 md:flex-none">
+            <div class="text-[10px] uppercase tracking-wider text-ink-400 font-semibold">Model</div>
+            <div class="text-sm font-medium text-ink-900 mt-1 truncate" id="metricModel">—</div>
+          </div>
         </div>
       </div>
-    </section>
-  </div>
+    </div>
 
-  <footer class="mt-12 mb-6 text-center text-[11px] font-mono text-white/30 tracking-[0.2em]">
-    THE AEGIS // BRING YOUR OWN KEY // SIMPLE · SAFE · FAST
-  </footer>
+    <!-- Conditions block (Conditional GO only) -->
+    <div id="conditionsCard" class="card p-6 mb-6 hidden border-amber-200 bg-amber-50/30">
+      <div class="flex items-start gap-3">
+        <div class="w-9 h-9 rounded-lg bg-amber-100 border border-amber-200 flex items-center justify-center flex-shrink-0">
+          <svg class="w-5 h-5 text-amber-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <div class="flex-1 min-w-0">
+          <h3 class="text-sm font-semibold text-ink-900">Conditions to satisfy before proceeding</h3>
+          <ul id="conditionsList" class="mt-3 space-y-2 text-sm text-ink-700 list-disc pl-5"></ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Risk matrix -->
+    <div class="card p-6 mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-semibold text-ink-900">Risk matrix</h2>
+        <span class="text-xs text-ink-500"><span id="riskCount">0</span> risks identified</span>
+      </div>
+      <div class="overflow-x-auto -mx-2">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-left text-[11px] uppercase tracking-wider text-ink-500 font-semibold">
+              <th class="px-3 pb-2 font-semibold">Risk</th>
+              <th class="px-3 pb-2 font-semibold w-32">Likelihood</th>
+              <th class="px-3 pb-2 font-semibold w-32">Impact</th>
+              <th class="px-3 pb-2 font-semibold">Mitigation</th>
+            </tr>
+          </thead>
+          <tbody id="riskTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Transcripts -->
+    <div class="card p-6 mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-semibold text-ink-900">Tribunal transcripts</h2>
+        <button id="toggleTranscripts" class="text-xs font-medium text-indigo-600 hover:text-indigo-700">Show transcripts</button>
+      </div>
+      <div id="transcriptsWrap" class="hidden grid grid-cols-1 md:grid-cols-3 gap-4 mt-2"></div>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex flex-wrap items-center gap-3">
+      <button id="newAnalysisBtn" class="btn-primary px-5 py-2.5 rounded-lg font-semibold text-sm">
+        Run another analysis
+      </button>
+      <button id="exportBtn" class="btn-secondary px-4 py-2.5 rounded-lg font-medium text-sm">
+        <span class="inline-flex items-center gap-1.5">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export as JSON
+        </span>
+      </button>
+      <button id="copyHeadlineBtn" class="btn-secondary px-4 py-2.5 rounded-lg font-medium text-sm">Copy headline</button>
+    </div>
+  </section>
 </main>
 
-<!-- ARCHIVE DRAWER -->
-<div id="drawerBackdrop" class="drawer-backdrop fixed inset-0 bg-black/60 z-50"></div>
-<aside id="drawer" class="drawer fixed top-0 right-0 bottom-0 z-[60] w-full sm:w-[480px] glass-strong border-l border-white/10 flex flex-col">
-  <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
+<!-- ============= Past Reports Drawer ============= -->
+<div id="drawerBackdrop" class="drawer-backdrop fixed inset-0 bg-ink-900/40 z-40"></div>
+<aside id="drawer" class="drawer fixed top-0 right-0 bottom-0 z-50 w-full sm:w-[440px] bg-white border-l border-ink-200 flex flex-col">
+  <div class="px-5 py-4 border-b border-ink-100 flex items-center justify-between">
     <div>
-      <div class="text-[10px] font-mono tracking-[0.24em] text-white/40">// PAST CHECKS</div>
-      <h3 class="text-lg font-bold">Your Saved Answers</h3>
+      <h3 class="font-semibold text-ink-900">Past reports</h3>
+      <p class="text-xs text-ink-500">Cached rulings from your previous runs</p>
     </div>
-    <button id="closeDrawer" class="chip clickable">CLOSE</button>
+    <button id="closeDrawer" class="text-ink-400 hover:text-ink-700 transition">
+      <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
   </div>
-  <div id="archiveBody" class="flex-1 overflow-y-auto scroller p-4 space-y-3">
-    <div class="text-white/40 text-xs font-mono">loading...</div>
-  </div>
+  <div id="archiveBody" class="flex-1 overflow-y-auto p-4 space-y-3"></div>
 </aside>
 
-<!-- TOAST -->
+<!-- Toast -->
 <div id="toast" class="toast"></div>
 
 <script>
 (() => {
+  // ---------------- Helpers ---------------------------------------------
   const $ = (id) => document.getElementById(id);
-  const apiKey = $('apiKey');
-  const toggleKey = $('toggleKey');
-  const keyDot = $('keyDot');
-  const pdfFile = $('pdfFile');
-  const dropZone = $('dropZone');
-  const fileLabel = $('fileLabel');
-  const fileChip = $('fileChip');
-  const modelSelect = $('modelSelect');
-  const forceToggle = $('forceToggle');
-  const deployBtn = $('deployBtn');
-  const cancelBtn = $('cancelBtn');
-  const statusDot = $('statusDot');
-  const statusText = $('statusText');
-  const timer = $('timer');
-  const tokenMeter = $('tokenMeter');
-  const logTail = $('logTail');
-  const verdictBanner = $('verdictBanner');
-  const verdictText = $('verdictText');
-  const verdictMeta = $('verdictMeta');
-  const verdictIcon = $('verdictIcon');
-  const verdictHeadline = $('verdictHeadline');
-  const verdictConditions = $('verdictConditions');
-  const cacheChip = $('cacheChip');
-  const truncChip = $('truncChip');
-  const exportBtn = $('exportBtn');
-  const gaugeFill = $('gaugeFill');
-  const gaugeScore = $('gaugeScore');
-  const riskMatrixWrap = $('riskMatrixWrap');
-  const riskMatrixBody = $('riskMatrixBody');
-  const drawer = $('drawer');
-  const drawerBackdrop = $('drawerBackdrop');
-  const archiveBody = $('archiveBody');
-  const toastEl = $('toast');
+  marked.setOptions({ breaks: true, gfm: true });
 
-  const streams = { alex: $('stream-alex'), sam: $('stream-sam'), maya: $('stream-maya') };
-  const cards   = { alex: $('card-alex'),   sam: $('card-sam'),   maya: $('card-maya')   };
-  const tags    = { alex: $('t-alex'),      sam: $('t-sam'),      maya: $('t-maya')      };
+  // ---------------- State -----------------------------------------------
+  const state = {
+    view: 'setup',
+    apiKey: '',
+    file: null,
+    model: $('modelSelect').value,
+    force: false,
+    socket: null,
+    timerHandle: null,
+    startTs: 0,
+    raw: { alex: '', sam: '', maya: '' },
+    counts: { alex: 0, sam: 0, maya: 0 },
+    lastVerdict: null,
+  };
 
-  Object.values(streams).forEach(el => { el.textContent = el.dataset.placeholder || ''; });
+  const els = {
+    apiKey: $('apiKey'),
+    toggleKey: $('toggleKey'),
+    keyDot: $('keyDot'),
+    pdfFile: $('pdfFile'),
+    dropZone: $('dropZone'),
+    dropEmpty: $('dropEmpty'),
+    dropFilled: $('dropFilled'),
+    fileName: $('fileName'),
+    fileSize: $('fileSize'),
+    fileClear: $('fileClear'),
+    modelSelect: $('modelSelect'),
+    forceToggle: $('forceToggle'),
+    startBtn: $('startBtn'),
+    cancelBtn: $('cancelBtn'),
+    timer: $('timer'),
+    headerModel: $('headerModel'),
+    logTail: $('logTail'),
+    toast: $('toast'),
+    streams: { alex: $('stream-alex'), sam: $('stream-sam'), maya: $('stream-maya') },
+    cards:   { alex: $('card-alex'),   sam: $('card-sam'),   maya: $('card-maya') },
+    tags:    { alex: $('t-alex'),      sam: $('t-sam'),      maya: $('t-maya') },
+    steps:   { alex: $('step-alex'),   sam: $('step-sam'),   maya: $('step-maya') },
+    words:   { alex: $('words-alex'),  sam: $('words-sam'),  maya: $('words-maya') },
+    verdictTile: $('verdictTile'),
+    verdictBadge: $('verdictBadge'),
+    verdictText: $('verdictText'),
+    verdictHeadline: $('verdictHeadline'),
+    gaugeFill: $('gaugeFill'),
+    gaugeScore: $('gaugeScore'),
+    gaugeBand: $('gaugeBand'),
+    cacheBadge: $('cacheBadge'),
+    cacheTime: $('cacheTime'),
+    truncBadge: $('truncBadge'),
+    metricTime: $('metricTime'),
+    metricTokens: $('metricTokens'),
+    metricCost: $('metricCost'),
+    metricModel: $('metricModel'),
+    conditionsCard: $('conditionsCard'),
+    conditionsList: $('conditionsList'),
+    riskCount: $('riskCount'),
+    riskTableBody: $('riskTableBody'),
+    transcriptsWrap: $('transcriptsWrap'),
+    toggleTranscripts: $('toggleTranscripts'),
+    archiveBody: $('archiveBody'),
+    drawer: $('drawer'),
+    drawerBackdrop: $('drawerBackdrop'),
+  };
+  const GAUGE_CIRC = 2 * Math.PI * 72;
 
-  let selectedFile = null;
-  let socket = null;
-  let timerHandle = null;
-  let startTs = 0;
-  let totalTokens = 0;
-  let lastVerdict = null;
-  const GAUGE_C = 2 * Math.PI * 52;
-
-  function setStatus(text, mode) {
-    statusText.textContent = text;
-    statusDot.className = 'pulse-dot ' + (mode || 'idle');
+  // ---------------- View switching --------------------------------------
+  function setView(name) {
+    state.view = name;
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    $('view-' + name).classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'instant' });
   }
-  function log(msg, tag = 'info') {
-    logTail.innerHTML = `<span class="text-white/30">[${tag}]</span> ${msg}`;
-  }
+
+  // ---------------- Toast -----------------------------------------------
   function toast(msg, kind = 'ok') {
-    toastEl.textContent = msg;
-    toastEl.className = `toast show ${kind}`;
+    els.toast.innerHTML = msg;
+    els.toast.className = `toast show ${kind}`;
     clearTimeout(toast._t);
-    toast._t = setTimeout(() => { toastEl.className = 'toast'; }, 4200);
-  }
-  function updateDeployable() {
-    deployBtn.disabled = !(apiKey.value.trim() && selectedFile);
-    keyDot.className = 'pulse-dot ' + (apiKey.value.trim() ? 'live' : 'idle');
+    toast._t = setTimeout(() => { els.toast.className = 'toast'; }, 4200);
   }
 
-  toggleKey.addEventListener('click', () => {
-    const showing = apiKey.type === 'text';
-    apiKey.type = showing ? 'password' : 'text';
-    toggleKey.textContent = showing ? 'SHOW' : 'HIDE';
+  function log(msg, tag = 'system') {
+    els.logTail.innerHTML = `<span class="text-ink-400">[${tag}]</span> ${msg}`;
+  }
+
+  // ---------------- Setup view bindings ---------------------------------
+  function updateStart() {
+    els.startBtn.disabled = !(els.apiKey.value.trim() && state.file);
+    els.keyDot.style.background = els.apiKey.value.trim() ? '#10b981' : '#cbd5e1';
+  }
+  els.apiKey.addEventListener('input', updateStart);
+  els.toggleKey.addEventListener('click', () => {
+    const showing = els.apiKey.type === 'text';
+    els.apiKey.type = showing ? 'password' : 'text';
+    els.toggleKey.textContent = showing ? 'Show' : 'Hide';
   });
-  apiKey.addEventListener('input', updateDeployable);
 
   function pickFile(file) {
     if (!file) return;
     if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
-      toast('please choose a PDF file', 'error'); return;
+      toast('Please choose a PDF file', 'error'); return;
     }
-    selectedFile = file;
-    fileLabel.textContent = `${file.name} • ${(file.size/1024).toFixed(1)} KB`;
-    fileChip.classList.remove('hidden');
-    log(`file ready → <span class="text-white/70">${file.name}</span>`, 'file');
-    updateDeployable();
+    state.file = file;
+    els.fileName.textContent = file.name;
+    els.fileSize.textContent = `${(file.size/1024).toFixed(1)} KB`;
+    els.dropEmpty.classList.add('hidden');
+    els.dropFilled.classList.remove('hidden');
+    els.dropFilled.classList.add('flex');
+    updateStart();
   }
-  pdfFile.addEventListener('change', (e) => pickFile(e.target.files[0]));
-  ['dragenter','dragover'].forEach(ev => dropZone.addEventListener(ev, e => {
-    e.preventDefault(); e.stopPropagation(); dropZone.classList.add('drag');
+  function clearFile(e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    state.file = null;
+    els.pdfFile.value = '';
+    els.dropEmpty.classList.remove('hidden');
+    els.dropFilled.classList.add('hidden');
+    els.dropFilled.classList.remove('flex');
+    updateStart();
+  }
+  els.pdfFile.addEventListener('change', (e) => pickFile(e.target.files[0]));
+  els.fileClear.addEventListener('click', clearFile);
+  ['dragenter','dragover'].forEach(ev => els.dropZone.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation(); els.dropZone.classList.add('drag');
   }));
-  ['dragleave','drop'].forEach(ev => dropZone.addEventListener(ev, e => {
-    e.preventDefault(); e.stopPropagation(); dropZone.classList.remove('drag');
+  ['dragleave','drop'].forEach(ev => els.dropZone.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation(); els.dropZone.classList.remove('drag');
   }));
-  dropZone.addEventListener('drop', e => pickFile(e.dataTransfer.files && e.dataTransfer.files[0]));
+  els.dropZone.addEventListener('drop', e => pickFile(e.dataTransfer.files && e.dataTransfer.files[0]));
 
-  $('clearBtn').addEventListener('click', resetTerminals);
-  exportBtn.addEventListener('click', () => {
-    if (!lastVerdict) return;
-    const blob = new Blob([JSON.stringify(lastVerdict, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `aegis-${(lastVerdict.filename || 'doc').replace(/\.pdf$/i,'')}-${Date.now()}.json`;
-    document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(url);
-    toast('answer saved as JSON', 'ok');
-  });
+  els.modelSelect.addEventListener('change', () => { state.model = els.modelSelect.value; });
+  els.forceToggle.addEventListener('change', () => { state.force = els.forceToggle.checked; });
 
-  function resetTerminals() {
-    Object.entries(streams).forEach(([, el]) => {
-      el.classList.remove('cursor');
-      el.textContent = el.dataset.placeholder || '';
-    });
-    Object.values(cards).forEach(c => c.classList.remove('active'));
-    Object.values(tags).forEach(t => { t.textContent = 'waiting'; t.className = 'text-white/30'; });
-    verdictBanner.classList.add('hidden');
-    verdictBanner.classList.remove('verdict-go','verdict-nogo','verdict-cond');
-    cacheChip.classList.add('hidden');
-    truncChip.classList.add('hidden');
-    exportBtn.classList.add('hidden');
-    riskMatrixWrap.classList.add('hidden');
-    verdictConditions.classList.add('hidden');
-    riskMatrixBody.innerHTML = '';
-    totalTokens = 0; tokenMeter.textContent = '0';
-    timer.textContent = '00.00s';
-    gaugeFill.style.strokeDashoffset = GAUGE_C;
-    gaugeScore.textContent = '0';
-    lastVerdict = null;
+  // ---------------- Streaming rendering ---------------------------------
+  function setStepActive(id) {
+    Object.values(els.steps).forEach(s => s.classList.remove('active'));
+    els.steps[id].classList.add('active');
+  }
+  function setStepDone(id) { els.steps[id].classList.remove('active'); els.steps[id].classList.add('done'); }
+
+  function setHelperStatus(id, label, kind) {
+    const t = els.tags[id];
+    t.textContent = label;
+    t.className = 'pill pill-' + kind;
   }
 
-  function activateHelper(id, name) {
-    Object.values(cards).forEach(c => c.classList.remove('active'));
-    cards[id].classList.add('active');
-    streams[id].textContent = '';
-    streams[id].classList.add('cursor');
-    tags[id].textContent = 'talking';
-    tags[id].className = '';
-    log(`${name} is talking`, id);
+  function activateHelper(id) {
+    els.streams[id].innerHTML = '<div class="cursor-content cursor"></div>';
+    els.cards[id].classList.add('streaming');
+    els.cards[id].classList.remove('done');
+    setStepActive(id);
+    setHelperStatus(id, 'Streaming', 'info');
   }
+
   function finishHelper(id, info) {
-    streams[id].classList.remove('cursor');
-    const t = info && info.est_tokens ? ` • ~${info.est_tokens.toLocaleString()} words` : '';
-    tags[id].textContent = 'done' + t;
-    tags[id].className = 'text-white/50';
+    els.cards[id].classList.remove('streaming');
+    els.cards[id].classList.add('done');
+    setStepDone(id);
+    setHelperStatus(id, 'Complete', 'success');
     if (info && info.est_tokens) {
-      totalTokens += info.est_tokens;
-      tokenMeter.textContent = totalTokens.toLocaleString();
+      state.counts[id] = info.est_tokens;
+      els.words[id].textContent = info.est_tokens.toLocaleString();
     }
+    // Re-render markdown without cursor
+    renderHelperMarkdown(id, false);
   }
+
+  function renderHelperMarkdown(id, withCursor) {
+    let txt = state.raw[id] || '';
+    // For Maya, strip the trailing JSON code fence from display
+    if (id === 'maya') {
+      const m = txt.match(/^([\s\S]*?)```(?:json)?\s*\{[\s\S]*?\}\s*```\s*$/);
+      if (m) txt = m[1].trimEnd();
+    }
+    const html = marked.parse(txt);
+    els.streams[id].innerHTML = html + (withCursor ? '<span class="cursor"></span>' : '');
+    els.streams[id].scrollTop = els.streams[id].scrollHeight;
+  }
+
+  let renderQueued = { alex: false, sam: false, maya: false };
+  function scheduleRender(id) {
+    if (renderQueued[id]) return;
+    renderQueued[id] = true;
+    requestAnimationFrame(() => {
+      renderHelperMarkdown(id, true);
+      renderQueued[id] = false;
+    });
+  }
+
   function appendToken(id, token) {
-    const el = streams[id];
-    el.textContent += token;
-    el.scrollTop = el.scrollHeight;
+    state.raw[id] = (state.raw[id] || '') + token;
+    // approximate word count live
+    const approx = Math.max(1, Math.round(state.raw[id].length / 5));
+    els.words[id].textContent = approx.toLocaleString();
+    scheduleRender(id);
+  }
+
+  function resetAnalysis() {
+    state.raw = { alex: '', sam: '', maya: '' };
+    state.counts = { alex: 0, sam: 0, maya: 0 };
+    Object.keys(els.streams).forEach(id => {
+      els.streams[id].innerHTML = `<div class="stream-placeholder">${id === 'alex' ? 'Awaiting deployment…' : id === 'sam' ? 'Waiting for Strategist to finish…' : 'Waiting for both arguments…'}</div>`;
+      els.cards[id].classList.remove('streaming', 'done');
+      els.steps[id].classList.remove('active', 'done');
+      setHelperStatus(id, 'Waiting', 'neutral');
+      els.words[id].textContent = '0';
+    });
+    els.timer.textContent = '00.00s';
   }
 
   function startTimer() {
-    startTs = performance.now();
-    timerHandle = setInterval(() => {
-      const s = ((performance.now() - startTs) / 1000).toFixed(2);
-      timer.textContent = `${s.padStart(5,'0')}s`;
+    state.startTs = performance.now();
+    state.timerHandle = setInterval(() => {
+      const s = ((performance.now() - state.startTs) / 1000).toFixed(2);
+      els.timer.textContent = `${s.padStart(5,'0')}s`;
     }, 60);
   }
-  function stopTimer() { if (timerHandle) clearInterval(timerHandle); timerHandle = null; }
+  function stopTimer() { if (state.timerHandle) clearInterval(state.timerHandle); state.timerHandle = null; }
 
-  function gaugeColor(score) {
-    if (score <= 33) return '#34f7a1';
-    if (score <= 66) return '#ffb020';
-    return '#ff5577';
-  }
-  function renderGauge(score) {
-    const clamped = Math.max(0, Math.min(100, score|0));
-    gaugeFill.style.stroke = gaugeColor(clamped);
-    gaugeFill.style.strokeDashoffset = GAUGE_C * (1 - clamped / 100);
-    gaugeScore.textContent = clamped;
-  }
-  function sevClass(s) {
-    s = (s||'').toLowerCase();
-    if (s.startsWith('h')) return 'sev-high';
-    if (s.startsWith('m')) return 'sev-med';
-    return 'sev-low';
-  }
-  function renderRiskMatrix(risks) {
-    if (!Array.isArray(risks) || !risks.length) { riskMatrixWrap.classList.add('hidden'); return; }
-    riskMatrixBody.innerHTML = '';
-    risks.forEach(r => {
-      const tr = document.createElement('tr');
-      tr.className = 'risk-row border-t border-white/5 align-top';
-      tr.innerHTML = `
-        <td class="px-3 py-2.5 text-white/85">${escapeHtml(r.risk||'')}</td>
-        <td class="px-3 py-2.5"><span class="sev-badge ${sevClass(r.likelihood)}">${escapeHtml(r.likelihood||'')}</span></td>
-        <td class="px-3 py-2.5"><span class="sev-badge ${sevClass(r.impact)}">${escapeHtml(r.impact||'')}</span></td>
-        <td class="px-3 py-2.5 text-white/65 text-[13px]">${escapeHtml(r.mitigation||'')}</td>`;
-      riskMatrixBody.appendChild(tr);
-    });
-    riskMatrixWrap.classList.remove('hidden');
-  }
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  }
-  function friendlyVerdict(v) {
-    if (v === 'GO') return 'YES';
-    if (v === 'NO-GO') return 'NO';
+  // ---------------- Verdict rendering -----------------------------------
+  function friendly(v) {
+    if (v === 'GO') return 'GO';
+    if (v === 'NO-GO') return 'NO-GO';
     if (v === 'CONDITIONAL-GO') return 'MAYBE';
     return v || '—';
+  }
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function sevPill(s) {
+    s = (s || '').toLowerCase();
+    if (s.startsWith('h')) return 'pill pill-high';
+    if (s.startsWith('m')) return 'pill pill-med';
+    return 'pill pill-low';
+  }
+  function gaugeColor(score) {
+    if (score <= 33) return '#10b981';
+    if (score <= 66) return '#f59e0b';
+    return '#ef4444';
+  }
+  function gaugeBand(score) {
+    if (score <= 33) return 'low risk';
+    if (score <= 66) return 'medium risk';
+    return 'high risk';
+  }
+  function applyVerdictTheme(verdict) {
+    els.verdictTile.classList.remove('is-go','is-nogo','is-cond');
+    els.verdictText.classList.remove('verdict-go','verdict-nogo','verdict-cond');
+    let badgeKind = 'pill-info', label = 'Recommendation';
+    if (verdict === 'GO') {
+      els.verdictTile.classList.add('is-go');
+      els.verdictText.classList.add('verdict-go');
+      badgeKind = 'pill-success'; label = 'Proceed';
+    } else if (verdict === 'NO-GO') {
+      els.verdictTile.classList.add('is-nogo');
+      els.verdictText.classList.add('verdict-nogo');
+      badgeKind = 'pill-error'; label = 'Do not proceed';
+    } else {
+      els.verdictTile.classList.add('is-cond');
+      els.verdictText.classList.add('verdict-cond');
+      badgeKind = 'pill-warn'; label = 'Proceed with conditions';
+    }
+    els.verdictBadge.className = 'pill ' + badgeKind;
+    els.verdictBadge.textContent = label;
   }
 
   function renderVerdict(msg) {
     const v = (msg.verdict || '').toUpperCase();
-    let cls = 'verdict-cond', icon = '⚖', color = 'text-amber-300';
-    if (v === 'GO') { cls = 'verdict-go'; icon = '✓'; color = 'text-emerald-300'; }
-    else if (v === 'NO-GO') { cls = 'verdict-nogo'; icon = '✕'; color = 'text-rose-300'; }
-    verdictBanner.classList.remove('hidden','verdict-go','verdict-nogo','verdict-cond');
-    verdictBanner.classList.add(cls);
-    verdictText.textContent = friendlyVerdict(v);
-    verdictText.className = `text-3xl font-extrabold tracking-tight ${color}`;
-    verdictIcon.textContent = icon;
-    verdictIcon.className = `text-2xl ${color}`;
-    verdictHeadline.textContent = msg.headline || '';
-
-    const parts = [];
-    if (msg.model) parts.push(msg.model);
-    if (msg.cached) parts.push(`from cache • first run was ${msg.original_time}s`);
-    else parts.push(`done in ${msg.execution_time}s`);
-    if (typeof msg.total_tokens === 'number') parts.push(`~${msg.total_tokens.toLocaleString()} words`);
-    if (typeof msg.estimated_cost_usd === 'number' && msg.estimated_cost_usd > 0)
-      parts.push(`≈ $${msg.estimated_cost_usd.toFixed(4)}`);
-    verdictMeta.textContent = parts.join(' · ');
-
-    renderGauge(msg.risk_score || 0);
-
     const struct = msg.structured || {};
-    renderRiskMatrix(struct.risks || []);
 
-    if (v === 'CONDITIONAL-GO' && Array.isArray(struct.conditions) && struct.conditions.length) {
-      verdictConditions.innerHTML = 'RULES TO FIX: ' + struct.conditions.map(escapeHtml).join(' • ');
-      verdictConditions.classList.remove('hidden');
+    applyVerdictTheme(v);
+    els.verdictText.textContent = friendly(v);
+    els.verdictHeadline.textContent = msg.headline || '';
+
+    // Gauge
+    const score = Math.max(0, Math.min(100, msg.risk_score || 0));
+    els.gaugeFill.style.stroke = gaugeColor(score);
+    els.gaugeFill.style.strokeDashoffset = GAUGE_CIRC * (1 - score / 100);
+    els.gaugeBand.textContent = gaugeBand(score);
+    // Count up animation
+    let n = 0;
+    const target = score;
+    const step = Math.max(1, Math.round(target / 24));
+    clearInterval(els.gaugeScore._t);
+    els.gaugeScore._t = setInterval(() => {
+      n = Math.min(target, n + step);
+      els.gaugeScore.textContent = n;
+      if (n >= target) clearInterval(els.gaugeScore._t);
+    }, 28);
+
+    // Cache badge
+    if (msg.cached) {
+      els.cacheBadge.classList.remove('hidden');
+      els.cacheTime.textContent = `${msg.original_time}s saved`;
+      els.metricTime.innerHTML = `<span class="text-emerald-700">0.97s</span> <span class="text-xs text-ink-500 font-normal">(cached)</span>`;
+      // The 0.97s above is symbolic for the cached replay — replaced by the live elapsed from cache hit
+    } else {
+      els.cacheBadge.classList.add('hidden');
+      els.metricTime.textContent = `${msg.execution_time}s`;
+    }
+    // Use actual measured elapsed in case server-side reports zero
+    const measuredElapsed = state.measuredElapsed || msg.execution_time || 0;
+    if (msg.cached) els.metricTime.innerHTML = `<span class="text-emerald-700">${measuredElapsed.toFixed(2)}s</span> <span class="text-xs text-ink-500 font-normal">cached</span>`;
+    els.metricTokens.textContent = (msg.total_tokens || 0).toLocaleString();
+    els.metricCost.textContent = (typeof msg.estimated_cost_usd === 'number' && !msg.cached)
+      ? `$${msg.estimated_cost_usd.toFixed(4)}`
+      : '$0.0000';
+    els.metricModel.textContent = msg.model || state.model;
+
+    // Conditions
+    const conds = Array.isArray(struct.conditions) ? struct.conditions : [];
+    if (v === 'CONDITIONAL-GO' && conds.length) {
+      els.conditionsList.innerHTML = conds.map(c => `<li>${escapeHtml(c)}</li>`).join('');
+      els.conditionsCard.classList.remove('hidden');
+    } else {
+      els.conditionsCard.classList.add('hidden');
     }
 
-    lastVerdict = { ...msg };
-    exportBtn.classList.remove('hidden');
+    // Risk matrix
+    const risks = Array.isArray(struct.risks) ? struct.risks : [];
+    els.riskCount.textContent = risks.length;
+    els.riskTableBody.innerHTML = risks.map(r => `
+      <tr class="border-t border-ink-100 align-top">
+        <td class="px-3 py-3 font-medium text-ink-900">${escapeHtml(r.risk)}</td>
+        <td class="px-3 py-3"><span class="${sevPill(r.likelihood)}">${escapeHtml(r.likelihood)}</span></td>
+        <td class="px-3 py-3"><span class="${sevPill(r.impact)}">${escapeHtml(r.impact)}</span></td>
+        <td class="px-3 py-3 text-ink-600">${escapeHtml(r.mitigation)}</td>
+      </tr>`).join('');
+
+    // Transcripts (built on demand)
+    state.lastVerdict = { ...msg, raw: { ...state.raw } };
+    els.transcriptsWrap.innerHTML = '';
+    els.toggleTranscripts.textContent = 'Show transcripts';
+    els.transcriptsWrap.classList.add('hidden');
   }
 
-  // ---- WebSocket flow ------------------------------------------------------
-  deployBtn.addEventListener('click', () => {
-    if (!apiKey.value.trim() || !selectedFile) return;
-    resetTerminals();
-    deployBtn.disabled = true;
-    cancelBtn.disabled = false;
-    setStatus('CONNECTING...', 'live');
-    log('opening live link → /ws/analyze', 'link');
+  function buildTranscripts() {
+    const meta = [
+      { id: 'alex', name: 'Alex', role: 'Strategist', accent: 'emerald' },
+      { id: 'sam',  name: 'Sam',  role: 'Red Team',   accent: 'rose' },
+      { id: 'maya', name: 'Maya', role: 'Judge',      accent: 'amber' },
+    ];
+    els.transcriptsWrap.innerHTML = meta.map(m => {
+      let txt = (state.lastVerdict && state.lastVerdict.raw && state.lastVerdict.raw[m.id]) || state.raw[m.id] || '';
+      if (m.id === 'maya') {
+        const mm = txt.match(/^([\s\S]*?)```(?:json)?\s*\{[\s\S]*?\}\s*```\s*$/);
+        if (mm) txt = mm[1].trimEnd();
+      }
+      const html = marked.parse(txt || '_No transcript_');
+      return `
+        <div class="card-soft p-4">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="w-7 h-7 rounded-full bg-${m.accent}-50 border border-${m.accent}-100 flex items-center justify-center text-${m.accent}-700 text-xs font-semibold">${m.name[0]}</span>
+            <div>
+              <div class="text-sm font-semibold leading-tight">${m.name}</div>
+              <div class="text-[10px] uppercase tracking-wider text-ink-500 font-medium">${m.role}</div>
+            </div>
+          </div>
+          <div class="prose-mini text-sm text-ink-700 max-h-72 overflow-y-auto pr-2">${html}</div>
+        </div>`;
+    }).join('');
+  }
+
+  els.toggleTranscripts.addEventListener('click', () => {
+    const open = !els.transcriptsWrap.classList.contains('hidden');
+    if (open) {
+      els.transcriptsWrap.classList.add('hidden');
+      els.toggleTranscripts.textContent = 'Show transcripts';
+    } else {
+      buildTranscripts();
+      els.transcriptsWrap.classList.remove('hidden');
+      els.toggleTranscripts.textContent = 'Hide transcripts';
+    }
+  });
+
+  // ---------------- Actions ---------------------------------------------
+  $('newAnalysisBtn').addEventListener('click', () => {
+    clearFile();
+    els.forceToggle.checked = false;
+    state.force = false;
+    setView('setup');
+  });
+  $('exportBtn').addEventListener('click', () => {
+    if (!state.lastVerdict) return;
+    const blob = new Blob([JSON.stringify(state.lastVerdict, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const stem = (state.file && state.file.name || 'verdict').replace(/\.pdf$/i, '');
+    a.download = `aegis-${stem}-${Date.now()}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    toast('Verdict exported as JSON', 'ok');
+  });
+  $('copyHeadlineBtn').addEventListener('click', async () => {
+    if (!state.lastVerdict) return;
+    const text = `${friendly(state.lastVerdict.verdict)} · risk ${state.lastVerdict.risk_score} · ${state.lastVerdict.headline}`;
+    try { await navigator.clipboard.writeText(text); toast('Copied to clipboard', 'ok'); }
+    catch { toast('Could not copy', 'error'); }
+  });
+
+  els.cancelBtn.addEventListener('click', () => {
+    if (state.socket && state.socket.readyState === WebSocket.OPEN) {
+      state.socket.close(4000, 'user-cancel');
+      toast('Analysis cancelled', 'warn');
+    }
+    stopTimer();
+    setView('setup');
+  });
+
+  // ---------------- WebSocket pipeline ----------------------------------
+  els.startBtn.addEventListener('click', () => {
+    if (!els.apiKey.value.trim() || !state.file) return;
+    resetAnalysis();
+    setView('analysis');
+    els.headerModel.textContent = els.modelSelect.value;
+    els.headerModel.classList.remove('hidden');
+    log('connecting…', 'system');
 
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    socket = new WebSocket(`${proto}://${location.host}/ws/analyze`);
-    socket.binaryType = 'arraybuffer';
+    state.socket = new WebSocket(`${proto}://${location.host}/ws/analyze`);
+    state.socket.binaryType = 'arraybuffer';
+    state.measuredElapsed = 0;
 
-    socket.addEventListener('open', async () => {
-      setStatus('SENDING FILE...', 'live');
-      socket.send(JSON.stringify({
-        api_key: apiKey.value.trim(),
-        filename: selectedFile.name,
-        model: modelSelect.value,
-        force: forceToggle.checked,
+    state.socket.addEventListener('open', async () => {
+      log('sending document…', 'system');
+      state.socket.send(JSON.stringify({
+        api_key: els.apiKey.value.trim(),
+        filename: state.file.name,
+        model: els.modelSelect.value,
+        force: els.forceToggle.checked,
       }));
-      const buf = await selectedFile.arrayBuffer();
-      socket.send(buf);
+      const buf = await state.file.arrayBuffer();
+      state.socket.send(buf);
       startTimer();
-      setStatus('HELPERS ARE TALKING', 'live');
     });
 
-    socket.addEventListener('message', (ev) => {
+    state.socket.addEventListener('message', (ev) => {
       let msg; try { msg = JSON.parse(ev.data); } catch { return; }
       switch (msg.type) {
-        case 'status': log(msg.message, 'info'); break;
-        case 'warning':
-          toast(msg.message, 'warn'); log(msg.message, 'warn'); break;
+        case 'status': log(msg.message, 'status'); break;
+        case 'warning': toast(msg.message, 'warn'); log(msg.message, 'warn'); break;
         case 'doc_meta':
-          if (msg.truncated) truncChip.classList.remove('hidden');
-          log(`file: ${msg.chars.toLocaleString()} letters total, reading ${msg.analyzed_chars.toLocaleString()} • ${msg.model}`, 'file');
+          if (msg.truncated) els.truncBadge.classList.remove('hidden');
+          else els.truncBadge.classList.add('hidden');
+          log(`document: ${msg.chars.toLocaleString()} chars · analyzing ${msg.analyzed_chars.toLocaleString()} · ${msg.model}`, 'doc');
           break;
         case 'cache_hit':
-          cacheChip.classList.remove('hidden');
-          if (msg.truncated) truncChip.classList.remove('hidden');
-          log(`found in cache → showing saved answer (first run was ${msg.original_time}s • ${msg.model})`, 'cache');
+          if (msg.truncated) els.truncBadge.classList.remove('hidden');
+          log(`cache hit · original run ${msg.original_time}s · ${msg.model}`, 'cache');
           break;
-        case 'helper_start': activateHelper(msg.helper, msg.name); break;
-        case 'helper_token': appendToken(msg.helper, msg.token); break;
-        case 'helper_end': finishHelper(msg.helper, msg); break;
+        case 'helper_start':
+          activateHelper(msg.helper);
+          break;
+        case 'helper_token':
+          appendToken(msg.helper, msg.token);
+          break;
+        case 'helper_end':
+          finishHelper(msg.helper, msg);
+          break;
         case 'verdict':
           stopTimer();
+          state.measuredElapsed = (performance.now() - state.startTs) / 1000;
           renderVerdict(msg);
-          setStatus(msg.cached ? 'FROM CACHE • FAST' : 'ALL DONE', 'live');
-          log(`answer ready → <strong>${friendlyVerdict(msg.verdict)}</strong> (risk ${msg.risk_score})`, 'maya');
-          toast(`answer: ${friendlyVerdict(msg.verdict)} • risk ${msg.risk_score}`,
-                msg.verdict === 'GO' ? 'ok' : msg.verdict === 'NO-GO' ? 'error' : 'warn');
-          deployBtn.disabled = false; cancelBtn.disabled = true;
+          // Smooth pause so the user briefly sees Maya complete before swapping views
+          setTimeout(() => setView('verdict'), 450);
           break;
         case 'fatal':
           stopTimer();
-          setStatus('STOPPED', 'err');
-          log(`error → ${msg.message}`, 'error');
           toast(msg.message, 'error');
-          deployBtn.disabled = false; cancelBtn.disabled = true;
+          log(`fatal · ${msg.message}`, 'error');
+          setTimeout(() => setView('setup'), 1200);
           break;
       }
     });
 
-    socket.addEventListener('close', () => {
-      stopTimer();
-      Object.values(streams).forEach(el => el.classList.remove('cursor'));
-      deployBtn.disabled = false; cancelBtn.disabled = true;
-    });
-    socket.addEventListener('error', () => {
-      setStatus('LINK ERROR', 'err');
-      log('link error', 'error');
-      toast('link error', 'error');
-    });
+    state.socket.addEventListener('close', () => { stopTimer(); });
+    state.socket.addEventListener('error', () => { toast('Connection error', 'error'); });
   });
 
-  cancelBtn.addEventListener('click', () => {
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.close(4000, 'user-stop');
-      setStatus('STOPPED BY YOU', 'err');
-      log('you stopped the check', 'stop');
-      toast('check stopped', 'warn');
-    }
-  });
-
-  // ---- Past Checks drawer --------------------------------------------------
-  function openDrawer() { drawer.classList.add('open'); drawerBackdrop.classList.add('open'); loadArchive(); }
-  function closeDrawer() { drawer.classList.remove('open'); drawerBackdrop.classList.remove('open'); }
+  // ---------------- Past reports drawer ---------------------------------
+  function openDrawer() { els.drawer.classList.add('open'); els.drawerBackdrop.classList.add('open'); loadArchive(); }
+  function closeDrawer() { els.drawer.classList.remove('open'); els.drawerBackdrop.classList.remove('open'); }
   $('openHistory').addEventListener('click', openDrawer);
   $('closeDrawer').addEventListener('click', closeDrawer);
-  drawerBackdrop.addEventListener('click', closeDrawer);
+  els.drawerBackdrop.addEventListener('click', closeDrawer);
 
   async function loadArchive() {
-    archiveBody.innerHTML = '<div class="text-white/40 text-xs font-mono">loading...</div>';
+    els.archiveBody.innerHTML = `<div class="space-y-3">${'<div class="skel h-24 rounded-xl"></div>'.repeat(3)}</div>`;
     try {
       const r = await fetch('/api/history?limit=30');
       const rows = await r.json();
       if (!rows.length) {
-        archiveBody.innerHTML = '<div class="text-white/40 text-xs font-mono">no saved checks yet — run one to see it here.</div>';
+        els.archiveBody.innerHTML = '<div class="text-sm text-ink-500 text-center py-8">No reports yet. Run an analysis to see it here.</div>';
         return;
       }
-      archiveBody.innerHTML = '';
+      els.archiveBody.innerHTML = '';
       rows.forEach(row => {
+        const v = row.verdict;
+        const accent = v === 'GO' ? 'emerald' : v === 'NO-GO' ? 'rose' : 'amber';
+        const kind   = v === 'GO' ? 'success' : v === 'NO-GO' ? 'error' : 'warn';
         const card = document.createElement('div');
-        const cls = row.verdict === 'GO' ? 'border-emerald-400/30' :
-                    row.verdict === 'NO-GO' ? 'border-rose-400/30' : 'border-amber-400/30';
-        card.className = `hist-card glass rounded-xl p-3 border ${cls}`;
-        const color = row.verdict === 'GO' ? 'text-emerald-300' :
-                      row.verdict === 'NO-GO' ? 'text-rose-300' : 'text-amber-300';
+        card.className = `card-soft p-4 hover:border-${accent}-200 transition`;
         card.innerHTML = `
-          <div class="flex items-center justify-between">
-            <div class="text-sm font-semibold truncate" title="${escapeHtml(row.filename)}">${escapeHtml(row.filename)}</div>
-            <button class="chip clickable text-white/40 hover:text-rose-300" data-del="${row.id}">DELETE</button>
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0 flex-1">
+              <div class="text-sm font-semibold text-ink-900 truncate" title="${escapeHtml(row.filename)}">${escapeHtml(row.filename)}</div>
+              <div class="text-xs text-ink-500 mt-1">${escapeHtml(row.headline || '—')}</div>
+            </div>
+            <button class="text-ink-400 hover:text-rose-600 transition p-1" data-del="${row.id}">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            </button>
           </div>
-          <div class="flex items-center gap-3 mt-2">
-            <span class="text-2xl font-extrabold ${color}">${friendlyVerdict(row.verdict)}</span>
-            <span class="chip">risk ${row.risk_score}</span>
-            <span class="chip">${row.model}</span>
+          <div class="flex items-center gap-2 mt-3 flex-wrap">
+            <span class="pill pill-${kind}">${friendly(v)}</span>
+            <span class="pill pill-neutral">Risk ${row.risk_score}</span>
+            <span class="pill pill-neutral">${row.model}</span>
           </div>
-          <div class="text-[11px] text-white/50 mt-2 leading-snug">${escapeHtml(row.headline || '')}</div>
-          <div class="text-[10px] font-mono text-white/30 mt-2">
-            ${row.execution_time}s · ~${(row.total_tokens||0).toLocaleString()} words · ${row.created_at || ''}
+          <div class="text-[11px] text-ink-400 font-mono mt-3">
+            ${row.execution_time}s · ~${(row.total_tokens||0).toLocaleString()} tokens · ${row.created_at ? new Date(row.created_at).toLocaleString() : ''}
           </div>`;
-        archiveBody.appendChild(card);
+        els.archiveBody.appendChild(card);
       });
-      archiveBody.querySelectorAll('[data-del]').forEach(btn => {
+      els.archiveBody.querySelectorAll('[data-del]').forEach(btn => {
         btn.addEventListener('click', async (e) => {
           e.stopPropagation();
           const id = btn.getAttribute('data-del');
           await fetch(`/api/cache/${id}`, { method: 'DELETE' });
-          toast(`deleted record ${id}`, 'ok');
+          toast('Report deleted', 'ok');
           loadArchive();
         });
       });
     } catch (err) {
-      archiveBody.innerHTML = `<div class="text-rose-300 text-xs font-mono">could not load past checks: ${escapeHtml(err.message)}</div>`;
+      els.archiveBody.innerHTML = `<div class="text-sm text-rose-600">Could not load reports: ${escapeHtml(err.message)}</div>`;
     }
   }
 
-  updateDeployable();
+  updateStart();
 })();
 </script>
 </body>

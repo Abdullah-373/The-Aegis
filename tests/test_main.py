@@ -36,7 +36,7 @@ def test_index_renders():
     r = client.get("/")
     assert r.status_code == 200
     body = r.text
-    for needle in ("Alex", "Sam", "Maya", "THE AEGIS", "Your Gemini API Key"):
+    for needle in ("Alex", "Sam", "Maya", "The Aegis", "Gemini API Key"):
         assert needle in body
 
 
