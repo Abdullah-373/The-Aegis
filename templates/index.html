@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>The Aegis :: Classified Tribunal Console</title>
+<title>The Aegis :: Three Helpers Check Your PDF</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
@@ -12,21 +12,17 @@
     --panel: rgba(18, 18, 22, 0.55);
     --panel-strong: rgba(22, 22, 28, 0.78);
     --border: rgba(255, 255, 255, 0.06);
-    --border-glow: rgba(0, 229, 255, 0.35);
     --cyan: #00e5ff;
     --amber: #ffb020;
     --rose: #ff3860;
     --green: #34f7a1;
     --violet: #b388ff;
-    --muted: #8a8d96;
   }
   html, body { background: var(--bg); color: #e7e9ee; font-family: 'Inter', system-ui, sans-serif; }
   .font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
 
-  /* Ambient background */
   body::before {
-    content: "";
-    position: fixed; inset: 0; z-index: -2;
+    content: ""; position: fixed; inset: 0; z-index: -2;
     background:
       radial-gradient(1100px 700px at 12% -10%, rgba(0,229,255,0.10), transparent 60%),
       radial-gradient(900px 600px at 110% 10%, rgba(179,136,255,0.10), transparent 60%),
@@ -34,8 +30,7 @@
       #050507;
   }
   body::after {
-    content: "";
-    position: fixed; inset: 0; z-index: -1;
+    content: ""; position: fixed; inset: 0; z-index: -1;
     background-image:
       linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
       linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
@@ -48,63 +43,44 @@
     backdrop-filter: blur(18px) saturate(140%);
     -webkit-backdrop-filter: blur(18px) saturate(140%);
     border: 1px solid var(--border);
-    box-shadow:
-      0 1px 0 rgba(255,255,255,0.04) inset,
-      0 0 0 1px rgba(255,255,255,0.02),
-      0 30px 80px -30px rgba(0,0,0,0.85);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 30px 80px -30px rgba(0,0,0,0.85);
   }
   .glass-strong {
     background: var(--panel-strong);
     backdrop-filter: blur(22px) saturate(160%);
     border: 1px solid rgba(255,255,255,0.08);
   }
-  .glow-cyan { box-shadow: 0 0 30px -10px var(--cyan), 0 0 1px var(--cyan) inset; }
-  .glow-rose { box-shadow: 0 0 30px -10px var(--rose), 0 0 1px var(--rose) inset; }
-  .glow-amber { box-shadow: 0 0 30px -10px var(--amber), 0 0 1px var(--amber) inset; }
-  .glow-green { box-shadow: 0 0 30px -10px var(--green), 0 0 1px var(--green) inset; }
 
-  /* Hero title */
-  .title-grad {
-    background: linear-gradient(180deg, #ffffff 0%, #b8c0ce 60%, #6b7280 100%);
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-  }
-  .accent-grad {
-    background: linear-gradient(90deg, #00e5ff 0%, #b388ff 100%);
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-  }
+  .title-grad { background: linear-gradient(180deg, #ffffff 0%, #b8c0ce 60%, #6b7280 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .accent-grad { background: linear-gradient(90deg, #00e5ff 0%, #b388ff 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
 
-  /* Deploy button */
   .deploy-btn {
     position: relative; overflow: hidden;
     background: linear-gradient(135deg, #00e5ff 0%, #6c8cff 50%, #b388ff 100%);
     color: #0a0a0a;
-    transition: transform .15s ease, box-shadow .3s ease, filter .2s ease;
-    box-shadow:
-      0 10px 40px -10px rgba(0,229,255,0.55),
-      0 0 0 1px rgba(255,255,255,0.15) inset;
+    transition: transform .15s ease, filter .2s ease;
+    box-shadow: 0 10px 40px -10px rgba(0,229,255,0.55), 0 0 0 1px rgba(255,255,255,0.15) inset;
   }
   .deploy-btn:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.08); }
   .deploy-btn:disabled { opacity: .55; cursor: not-allowed; filter: grayscale(.4); }
   .deploy-btn .shine {
     position: absolute; top: 0; left: -120%; width: 60%; height: 100%;
     background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent);
-    transform: skewX(-20deg);
-    animation: shine 3.4s ease-in-out infinite;
+    transform: skewX(-20deg); animation: shine 3.4s ease-in-out infinite;
   }
   @keyframes shine { 0% { left: -120%; } 60% { left: 220%; } 100% { left: 220%; } }
 
-  /* Drop zone */
   .drop-zone { transition: border-color .2s ease, background .2s ease, transform .2s ease; }
   .drop-zone.drag { border-color: var(--cyan); background: rgba(0,229,255,0.05); transform: scale(1.01); }
 
-  /* Status pill */
   .pulse-dot { width: 8px; height: 8px; border-radius: 999px; display: inline-block; }
   .pulse-dot.live { background: var(--green); box-shadow: 0 0 12px var(--green); animation: pulse 1.4s infinite; }
   .pulse-dot.idle { background: #444; }
   .pulse-dot.err  { background: var(--rose); box-shadow: 0 0 10px var(--rose); }
   @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.35 } }
 
-  /* Terminal */
   .terminal {
     background:
       linear-gradient(180deg, rgba(0,0,0,0.55), rgba(0,0,0,0.78)),
@@ -112,21 +88,19 @@
     border: 1px solid rgba(255,255,255,0.06);
     border-radius: 14px;
   }
-  .agent-stream {
+  .helper-stream {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 12.5px;
-    line-height: 1.55;
-    white-space: pre-wrap;
-    word-break: break-word;
+    font-size: 12.5px; line-height: 1.55;
+    white-space: pre-wrap; word-break: break-word;
   }
-  .strategist-color { color: #34f7a1; }
-  .red-team-color  { color: #ff5577; }
-  .judge-color     { color: #ffd166; }
-  .strategist-border { border-color: rgba(52,247,161,0.35); }
-  .red-team-border  { border-color: rgba(255,85,119,0.35); }
-  .judge-border     { border-color: rgba(255,209,102,0.35); }
+  .alex-color { color: #34f7a1; }
+  .sam-color  { color: #ff5577; }
+  .maya-color { color: #ffd166; }
+  .alex-border { border-color: rgba(52,247,161,0.35); }
+  .sam-border  { border-color: rgba(255,85,119,0.35); }
+  .maya-border { border-color: rgba(255,209,102,0.35); }
 
-  .agent-header {
+  .helper-header {
     display: flex; align-items: center; justify-content: space-between;
     padding: 10px 14px;
     border-bottom: 1px solid rgba(255,255,255,0.06);
@@ -134,43 +108,26 @@
     text-transform: uppercase;
   }
 
-  .scan {
-    position: relative; overflow: hidden;
-  }
+  .scan { position: relative; overflow: hidden; }
   .scan::before {
     content: ""; position: absolute; left: 0; right: 0; height: 2px; top: 0;
     background: linear-gradient(90deg, transparent, rgba(0,229,255,.55), transparent);
-    animation: scanline 2.2s linear infinite;
-    pointer-events: none;
+    animation: scanline 2.2s linear infinite; pointer-events: none;
   }
   @keyframes scanline { 0% { top: -2px } 100% { top: 100% } }
 
-  .cursor::after {
-    content: "▍"; display: inline-block; margin-left: 2px; opacity: .8;
-    animation: blink 1s steps(1) infinite;
-  }
+  .cursor::after { content: "▍"; display: inline-block; margin-left: 2px; opacity: .8; animation: blink 1s steps(1) infinite; }
   @keyframes blink { 50% { opacity: 0 } }
 
-  /* Markdown-ish table tweaks */
-  .agent-stream table { border-collapse: collapse; margin: 8px 0; width: 100%; }
-  .agent-stream th, .agent-stream td { border: 1px solid rgba(255,255,255,0.1); padding: 6px 10px; }
-  .agent-stream th { background: rgba(255,255,255,0.04); }
-
-  /* Verdict banner */
-  .verdict-card {
-    background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
-    border: 1px solid rgba(255,255,255,0.08);
-  }
+  .verdict-card { background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+    border: 1px solid rgba(255,255,255,0.08); }
   .verdict-go    { border-color: rgba(52,247,161,0.5); box-shadow: 0 0 60px -20px var(--green); }
   .verdict-nogo  { border-color: rgba(255,56,96,0.55); box-shadow: 0 0 60px -20px var(--rose); }
   .verdict-cond  { border-color: rgba(255,176,32,0.55); box-shadow: 0 0 60px -20px var(--amber); }
 
-  /* Custom scrollbar */
-  .scroller::-webkit-scrollbar { width: 10px; }
+  .scroller::-webkit-scrollbar { width: 10px; height: 10px; }
   .scroller::-webkit-scrollbar-track { background: transparent; }
-  .scroller::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,0.08); border-radius: 999px; border: 2px solid transparent; background-clip: content-box;
-  }
+  .scroller::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
   .scroller::-webkit-scrollbar-thumb:hover { background: rgba(0,229,255,0.35); background-clip: content-box; }
 
   .chip {
@@ -178,82 +135,129 @@
     padding: 4px 10px; border-radius: 999px;
     font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .12em;
     text-transform: uppercase; border: 1px solid rgba(255,255,255,0.08);
-    background: rgba(255,255,255,0.03);
+    background: rgba(255,255,255,0.03); cursor: default;
   }
+  .chip.clickable { cursor: pointer; transition: color .15s, border-color .15s; }
+  .chip.clickable:hover { color: var(--cyan); border-color: rgba(0,229,255,0.4); }
 
-  .key-input {
+  .key-input, .select-input {
     background: rgba(0,0,0,0.55);
     border: 1px solid rgba(255,255,255,0.08);
     color: #e7e9ee;
-    font-family: 'JetBrains Mono', monospace;
-    letter-spacing: .15em;
   }
-  .key-input:focus { outline: none; border-color: var(--cyan); box-shadow: 0 0 0 4px rgba(0,229,255,0.08); }
+  .key-input { font-family: 'JetBrains Mono', monospace; letter-spacing: .15em; }
+  .key-input:focus, .select-input:focus { outline: none; border-color: var(--cyan); box-shadow: 0 0 0 4px rgba(0,229,255,0.08); }
 
-  .agent-card { transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease; }
-  .agent-card.active { transform: translateY(-2px); }
-  .agent-card.active.strategist-border { box-shadow: 0 0 40px -15px #34f7a1; }
-  .agent-card.active.red-team-border  { box-shadow: 0 0 40px -15px #ff5577; }
-  .agent-card.active.judge-border     { box-shadow: 0 0 40px -15px #ffd166; }
+  .helper-card { transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease; }
+  .helper-card.active { transform: translateY(-2px); }
+  .helper-card.active.alex-border { box-shadow: 0 0 40px -15px #34f7a1; }
+  .helper-card.active.sam-border  { box-shadow: 0 0 40px -15px #ff5577; }
+  .helper-card.active.maya-border { box-shadow: 0 0 40px -15px #ffd166; }
+
+  .toggle { position: relative; width: 36px; height: 20px; }
+  .toggle input { display: none; }
+  .toggle .slider {
+    position: absolute; inset: 0; background: rgba(255,255,255,0.08);
+    border-radius: 999px; transition: background .2s;
+  }
+  .toggle .slider::before {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+    background: #e7e9ee; border-radius: 50%; transition: transform .2s;
+  }
+  .toggle input:checked + .slider { background: var(--cyan); }
+  .toggle input:checked + .slider::before { transform: translateX(16px); background: #0a0a0a; }
+
+  .gauge-track { stroke: rgba(255,255,255,0.08); }
+  .gauge-fill { transition: stroke-dashoffset .9s cubic-bezier(.2,.7,.2,1), stroke .6s; }
+
+  .toast {
+    position: fixed; right: 22px; bottom: 22px; z-index: 80;
+    min-width: 260px; max-width: 380px;
+    padding: 12px 14px; border-radius: 12px;
+    background: rgba(20,20,26,0.92); backdrop-filter: blur(14px);
+    border: 1px solid rgba(255,255,255,0.08); color: #e7e9ee;
+    font-size: 12.5px; font-family: 'JetBrains Mono', monospace;
+    transform: translateY(120%); opacity: 0; transition: all .3s cubic-bezier(.2,.7,.2,1);
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.error { border-color: rgba(255,56,96,0.5); box-shadow: 0 0 30px -10px var(--rose); }
+  .toast.warn { border-color: rgba(255,176,32,0.5); box-shadow: 0 0 30px -10px var(--amber); }
+  .toast.ok { border-color: rgba(52,247,161,0.5); box-shadow: 0 0 30px -10px var(--green); }
+
+  .drawer { transform: translateX(110%); transition: transform .35s cubic-bezier(.2,.7,.2,1); }
+  .drawer.open { transform: translateX(0); }
+  .drawer-backdrop { opacity: 0; pointer-events: none; transition: opacity .3s; }
+  .drawer-backdrop.open { opacity: 1; pointer-events: auto; }
+
+  .risk-row { transition: background .15s; }
+  .risk-row:hover { background: rgba(255,255,255,0.025); }
+  .sev-low  { color: #34f7a1; border-color: rgba(52,247,161,0.4); background: rgba(52,247,161,0.08); }
+  .sev-med  { color: #ffb020; border-color: rgba(255,176,32,0.4); background: rgba(255,176,32,0.08); }
+  .sev-high { color: #ff5577; border-color: rgba(255,85,119,0.4); background: rgba(255,85,119,0.08); }
+  .sev-badge { display:inline-block; padding: 2px 8px; border-radius: 999px; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .1em; border: 1px solid; text-transform: uppercase; }
+
+  .hist-card { transition: border-color .2s, transform .2s; cursor: pointer; }
+  .hist-card:hover { border-color: rgba(0,229,255,0.35); transform: translateY(-2px); }
 </style>
 </head>
 <body class="min-h-screen">
 
 <!-- TOP BAR -->
 <header class="sticky top-0 z-40 glass-strong border-b border-white/5">
-  <div class="max-w-[1400px] mx-auto px-6 py-3 flex items-center justify-between">
+  <div class="max-w-[1480px] mx-auto px-6 py-3 flex items-center justify-between">
     <div class="flex items-center gap-3">
-      <div class="w-9 h-9 rounded-lg flex items-center justify-center glow-cyan"
-           style="background: linear-gradient(135deg, #00e5ff, #b388ff);">
+      <div class="w-9 h-9 rounded-lg flex items-center justify-center"
+           style="background: linear-gradient(135deg, #00e5ff, #b388ff); box-shadow: 0 0 24px -6px #00e5ff;">
         <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="#0a0a0a" stroke-width="2.2">
           <path d="M12 2 4 5v7c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V5l-8-3Z"/>
         </svg>
       </div>
       <div>
-        <div class="text-[10px] font-mono tracking-[0.28em] text-white/40">CLASSIFIED // TIER-Ω</div>
-        <div class="text-lg font-extrabold tracking-tight">THE AEGIS<span class="accent-grad"> ::</span> Tribunal Console</div>
+        <div class="text-[10px] font-mono tracking-[0.28em] text-white/40">SAFE · SIMPLE · FAST</div>
+        <div class="text-lg font-extrabold tracking-tight">THE AEGIS<span class="accent-grad"> ::</span> Three Helpers</div>
       </div>
     </div>
-    <div class="hidden md:flex items-center gap-3 text-xs font-mono text-white/60">
-      <span class="chip"><span class="pulse-dot live"></span> SOCKET</span>
-      <span class="chip">MODEL: gemini-1.5-flash</span>
-      <span class="chip">BYOK ENFORCED</span>
+    <div class="hidden md:flex items-center gap-2 text-xs font-mono text-white/60">
+      <span class="chip"><span class="pulse-dot live"></span> ONLINE</span>
+      <span class="chip">YOUR KEY ONLY</span>
+      <button id="openHistory" class="chip clickable">PAST CHECKS</button>
     </div>
   </div>
 </header>
 
-<main class="max-w-[1400px] mx-auto px-6 py-10">
+<main class="max-w-[1480px] mx-auto px-6 py-10">
 
   <!-- HERO -->
   <section class="mb-10">
     <div class="flex items-center gap-2 mb-3">
       <span class="chip"><span class="pulse-dot live"></span> LIVE</span>
-      <span class="chip">MULTI-AGENT TRIBUNAL</span>
-      <span class="chip">ZERO-RETENTION</span>
+      <span class="chip">THREE HELPERS</span>
+      <span class="chip">CLEAR ANSWER</span>
+      <span class="chip">YOUR KEY STAYS WITH YOU</span>
     </div>
     <h1 class="text-5xl md:text-6xl font-extrabold leading-[1.05] tracking-tight title-grad">
-      Convene the tribunal.<br/>
-      <span class="accent-grad">Decide in seconds.</span>
+      Three helpers.<br/>
+      <span class="accent-grad">One clear answer.</span>
     </h1>
     <p class="mt-4 max-w-2xl text-white/60 text-[15px] leading-relaxed">
-      Three adversarial AI agents — Strategist, Red Team, Judge — argue your contract
-      in a live war-room terminal. Output is a binding risk matrix and a single
-      <span class="font-mono text-white/90">GO / NO-GO</span> verdict, cached for instant replay.
+      Send a PDF. Three AI helpers talk about it live: <span class="text-emerald-300 font-semibold">Alex</span> finds the good points,
+      <span class="text-rose-300 font-semibold">Sam</span> finds the problems, and <span class="text-amber-300 font-semibold">Maya</span> gives the
+      final answer — <span class="font-mono text-white/90">YES</span>, <span class="font-mono text-white/90">NO</span>, or <span class="font-mono text-white/90">MAYBE</span> with rules.
+      Same file next time? You get the answer at once.
     </p>
   </section>
 
-  <!-- WORKSPACE -->
   <div class="grid grid-cols-12 gap-6">
 
-    <!-- LEFT: CONTROL PANEL -->
+    <!-- LEFT: CONTROL -->
     <aside class="col-span-12 lg:col-span-4">
       <div class="glass rounded-2xl p-6">
         <div class="flex items-center justify-between mb-5">
           <div>
-            <div class="text-[10px] font-mono tracking-[0.24em] text-white/40">// CONTROL PANEL</div>
-            <h2 class="text-xl font-bold mt-1">Deployment Brief</h2>
+            <div class="text-[10px] font-mono tracking-[0.24em] text-white/40">// SETUP</div>
+            <h2 class="text-xl font-bold mt-1">Start a Check</h2>
           </div>
-          <div class="text-[10px] font-mono text-white/40">ENC-AES-256</div>
+          <div class="text-[10px] font-mono text-white/40">SAFE LINK</div>
         </div>
 
         <!-- API KEY -->
@@ -261,10 +265,10 @@
           <div class="flex items-center justify-between mb-2">
             <span class="text-sm font-semibold tracking-wide flex items-center gap-2">
               <svg class="w-4 h-4 text-cyan-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2 13 10"/><path d="m17 6 4 4"/><circle cx="9" cy="15" r="6"/></svg>
-              Gemini API Key
-              <span class="chip" style="border-color: rgba(0,229,255,0.4); color: #9ef0ff;">BYOK</span>
+              Your Gemini API Key
+              <span class="chip" style="border-color: rgba(0,229,255,0.4); color: #9ef0ff;">YOUR KEY</span>
             </span>
-            <button type="button" id="toggleKey" class="text-[11px] font-mono text-white/50 hover:text-cyan-300 transition">REVEAL</button>
+            <button type="button" id="toggleKey" class="text-[11px] font-mono text-white/50 hover:text-cyan-300 transition">SHOW</button>
           </div>
           <div class="relative">
             <input id="apiKey" type="password" autocomplete="off" spellcheck="false"
@@ -272,24 +276,36 @@
                    class="key-input w-full rounded-xl px-4 py-3 pr-10 text-sm"/>
             <span class="absolute right-3 top-1/2 -translate-y-1/2 pulse-dot idle" id="keyDot"></span>
           </div>
-          <p class="mt-2 text-[11px] text-white/40 font-mono">
-            Never stored. Never logged. Sent only to Google's endpoint for this session.
-          </p>
+          <p class="mt-2 text-[11px] text-white/40 font-mono">We never save it. We only use it for this one check.</p>
         </label>
 
-        <!-- FILE DROP -->
-        <div class="mt-6">
+        <!-- MODEL PICKER -->
+        <label class="block mt-5">
+          <span class="text-sm font-semibold tracking-wide flex items-center gap-2 mb-2">
+            <svg class="w-4 h-4 text-violet-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/></svg>
+            Pick a Model
+          </span>
+          <select id="modelSelect" class="select-input w-full rounded-xl px-3 py-2.5 text-sm font-mono">
+            {% for m in models %}
+              <option value="{{ m }}" {% if m == default_model %}selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+          </select>
+          <p class="mt-2 text-[11px] text-white/40 font-mono">Flash is fast and cheap. Pro is slower but smarter.</p>
+        </label>
+
+        <!-- FILE -->
+        <div class="mt-5">
           <div class="flex items-center justify-between mb-2">
             <span class="text-sm font-semibold tracking-wide flex items-center gap-2">
               <svg class="w-4 h-4 text-violet-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
-              Target Document
+              Your PDF
             </span>
-            <span id="fileChip" class="chip hidden">PDF LOADED</span>
+            <span id="fileChip" class="chip hidden">FILE READY</span>
           </div>
 
           <label id="dropZone" for="pdfFile"
                  class="drop-zone block rounded-xl border border-dashed border-white/15 bg-white/[0.02]
-                        px-4 py-8 text-center cursor-pointer hover:border-cyan-400/40">
+                        px-4 py-7 text-center cursor-pointer hover:border-cyan-400/40">
             <div class="flex flex-col items-center gap-3">
               <div class="w-12 h-12 rounded-xl flex items-center justify-center"
                    style="background: rgba(0,229,255,0.07); border: 1px solid rgba(0,229,255,0.25);">
@@ -298,43 +314,64 @@
                 </svg>
               </div>
               <div>
-                <div class="text-sm font-semibold">Drop classified PDF here</div>
-                <div class="text-[11px] text-white/40 font-mono mt-1" id="fileLabel">or click to browse — max ~5MB</div>
+                <div class="text-sm font-semibold">Drop your PDF here</div>
+                <div class="text-[11px] text-white/40 font-mono mt-1" id="fileLabel">or click to choose a file (about 5 MB max)</div>
               </div>
             </div>
             <input id="pdfFile" type="file" accept="application/pdf" class="hidden"/>
           </label>
         </div>
 
-        <!-- DEPLOY -->
-        <button id="deployBtn" disabled
-                class="deploy-btn w-full mt-6 rounded-xl py-3.5 font-extrabold tracking-[0.18em] text-sm">
-          <span class="shine"></span>
-          DEPLOY THE AEGIS
-        </button>
+        <!-- FORCE TOGGLE -->
+        <div class="mt-5 flex items-center justify-between">
+          <div>
+            <div class="text-sm font-semibold">Run again (skip cache)</div>
+            <div class="text-[11px] text-white/40 font-mono">do a fresh check, even if we have one saved</div>
+          </div>
+          <label class="toggle">
+            <input id="forceToggle" type="checkbox"/>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <!-- DEPLOY / CANCEL -->
+        <div class="mt-5 flex gap-2">
+          <button id="deployBtn" disabled
+                  class="deploy-btn flex-1 rounded-xl py-3.5 font-extrabold tracking-[0.18em] text-sm">
+            <span class="shine"></span>
+            START THE CHECK
+          </button>
+          <button id="cancelBtn" disabled
+                  class="rounded-xl px-4 py-3.5 text-sm font-mono tracking-wider border border-white/10 bg-white/[0.02] hover:border-rose-400/50 hover:text-rose-300 disabled:opacity-30 disabled:cursor-not-allowed transition">
+            STOP
+          </button>
+        </div>
 
         <!-- STATUS -->
-        <div class="mt-5 flex items-center justify-between text-[11px] font-mono">
+        <div class="mt-5 grid grid-cols-2 gap-2 text-[11px] font-mono">
           <div class="flex items-center gap-2 text-white/60">
             <span id="statusDot" class="pulse-dot idle"></span>
-            <span id="statusText">STANDBY // AWAITING BRIEF</span>
+            <span id="statusText" class="truncate">READY</span>
           </div>
-          <div id="timer" class="text-white/40">00.00s</div>
+          <div class="flex items-center justify-end gap-3 text-white/40">
+            <span title="time">⏱ <span id="timer">00.00s</span></span>
+            <span title="words used (about)">⌬ <span id="tokenMeter">0</span></span>
+          </div>
         </div>
       </div>
 
-      <!-- LEGEND -->
+      <!-- MEET THE HELPERS -->
       <div class="glass rounded-2xl p-5 mt-6">
-        <div class="text-[10px] font-mono tracking-[0.24em] text-white/40 mb-3">// AGENT REGISTRY</div>
+        <div class="text-[10px] font-mono tracking-[0.24em] text-white/40 mb-3">// MEET THE HELPERS</div>
         <ul class="space-y-2 text-sm">
-          <li class="flex items-center gap-3"><span class="w-2 h-2 rounded-full" style="background:#34f7a1; box-shadow:0 0 10px #34f7a1"></span> <span class="font-semibold">Strategist</span> <span class="text-white/40 text-xs">— bullish business case</span></li>
-          <li class="flex items-center gap-3"><span class="w-2 h-2 rounded-full" style="background:#ff5577; box-shadow:0 0 10px #ff5577"></span> <span class="font-semibold">Red Team</span> <span class="text-white/40 text-xs">— adversarial counsel</span></li>
-          <li class="flex items-center gap-3"><span class="w-2 h-2 rounded-full" style="background:#ffd166; box-shadow:0 0 10px #ffd166"></span> <span class="font-semibold">Judge</span> <span class="text-white/40 text-xs">— risk matrix + verdict</span></li>
+          <li class="flex items-center gap-3"><span class="w-2 h-2 rounded-full" style="background:#34f7a1; box-shadow:0 0 10px #34f7a1"></span> <span class="font-semibold">Alex</span> <span class="text-white/40 text-xs">— finds the good points</span></li>
+          <li class="flex items-center gap-3"><span class="w-2 h-2 rounded-full" style="background:#ff5577; box-shadow:0 0 10px #ff5577"></span> <span class="font-semibold">Sam</span> <span class="text-white/40 text-xs">— finds the problems</span></li>
+          <li class="flex items-center gap-3"><span class="w-2 h-2 rounded-full" style="background:#ffd166; box-shadow:0 0 10px #ffd166"></span> <span class="font-semibold">Maya</span> <span class="text-white/40 text-xs">— makes the choice</span></li>
         </ul>
       </div>
     </aside>
 
-    <!-- RIGHT: TRIBUNAL TERMINAL -->
+    <!-- RIGHT: LIVE TERMINAL -->
     <section class="col-span-12 lg:col-span-8">
       <div class="glass rounded-2xl p-5">
 
@@ -346,94 +383,141 @@
               <span class="w-2.5 h-2.5 rounded-full bg-[#27c93f]"></span>
             </span>
             <div>
-              <div class="text-[10px] font-mono tracking-[0.24em] text-white/40">// LIVE TRIBUNAL</div>
-              <h2 class="text-lg font-bold">aegis@tribunal:~$ <span class="accent-grad">stream</span></h2>
+              <div class="text-[10px] font-mono tracking-[0.24em] text-white/40">// LIVE</div>
+              <h2 class="text-lg font-bold">aegis@chat:~$ <span class="accent-grad">talk</span></h2>
             </div>
           </div>
           <div class="flex items-center gap-2">
-            <span id="cacheChip" class="chip hidden" style="border-color: rgba(0,229,255,0.4); color:#9ef0ff;">CACHE HIT • INSTANT</span>
-            <button id="clearBtn" class="chip hover:text-rose-300 transition">CLEAR</button>
+            <span id="cacheChip" class="chip hidden" style="border-color: rgba(0,229,255,0.4); color:#9ef0ff;">FROM CACHE • FAST</span>
+            <span id="truncChip" class="chip hidden" style="border-color: rgba(255,176,32,0.5); color:#ffd9a0;">FILE TOO LONG</span>
+            <button id="exportBtn" class="chip clickable hidden">SAVE JSON</button>
+            <button id="clearBtn" class="chip clickable">CLEAR</button>
           </div>
         </div>
 
         <!-- VERDICT BANNER -->
-        <div id="verdictBanner" class="verdict-card rounded-xl px-5 py-4 mb-5 hidden">
-          <div class="flex items-center justify-between">
-            <div>
-              <div class="text-[10px] font-mono tracking-[0.24em] text-white/40">// TRIBUNAL RULING</div>
-              <div class="flex items-baseline gap-3 mt-1">
-                <span id="verdictText" class="text-3xl font-extrabold tracking-tight">—</span>
-                <span id="verdictMeta" class="text-xs font-mono text-white/50"></span>
+        <div id="verdictBanner" class="verdict-card rounded-xl px-5 py-5 mb-5 hidden">
+          <div class="flex items-center gap-6">
+            <!-- Risk gauge -->
+            <div class="relative flex-shrink-0 w-[120px] h-[120px]">
+              <svg viewBox="0 0 120 120" class="w-full h-full -rotate-90">
+                <circle class="gauge-track" cx="60" cy="60" r="52" stroke-width="10" fill="none"/>
+                <circle id="gaugeFill" class="gauge-fill" cx="60" cy="60" r="52" stroke-width="10" fill="none"
+                        stroke-linecap="round" stroke="#34f7a1" stroke-dasharray="326.7" stroke-dashoffset="326.7"/>
+              </svg>
+              <div class="absolute inset-0 flex flex-col items-center justify-center">
+                <div id="gaugeScore" class="text-3xl font-extrabold leading-none">0</div>
+                <div class="text-[9px] font-mono tracking-[0.2em] text-white/40 mt-1">RISK</div>
               </div>
             </div>
-            <div id="verdictIcon" class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl font-extrabold">·</div>
+
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center justify-between gap-3 mb-1">
+                <div class="text-[10px] font-mono tracking-[0.24em] text-white/40">// FINAL ANSWER</div>
+                <div id="verdictMeta" class="text-[10px] font-mono text-white/40"></div>
+              </div>
+              <div class="flex items-baseline gap-3">
+                <span id="verdictText" class="text-3xl font-extrabold tracking-tight">—</span>
+                <span id="verdictIcon" class="text-2xl"></span>
+              </div>
+              <div id="verdictHeadline" class="mt-2 text-sm text-white/70 leading-snug"></div>
+              <div id="verdictConditions" class="mt-2 text-[12px] font-mono text-amber-200/80 hidden"></div>
+            </div>
+          </div>
+
+          <!-- RISK TABLE -->
+          <div id="riskMatrixWrap" class="mt-5 hidden">
+            <div class="text-[10px] font-mono tracking-[0.24em] text-white/40 mb-2">// LIST OF RISKS</div>
+            <div class="overflow-x-auto rounded-lg border border-white/5">
+              <table class="w-full text-sm">
+                <thead class="text-[10px] font-mono tracking-[0.18em] text-white/40">
+                  <tr class="bg-white/[0.02]">
+                    <th class="text-left px-3 py-2 font-normal">RISK</th>
+                    <th class="text-left px-3 py-2 font-normal w-[120px]">HOW LIKELY</th>
+                    <th class="text-left px-3 py-2 font-normal w-[120px]">HOW BAD</th>
+                    <th class="text-left px-3 py-2 font-normal">WHAT TO DO</th>
+                  </tr>
+                </thead>
+                <tbody id="riskMatrixBody"></tbody>
+              </table>
+            </div>
           </div>
         </div>
 
-        <!-- AGENT TERMINALS -->
+        <!-- HELPER PANELS -->
         <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
-
-          <!-- Strategist -->
-          <article id="card-strategist" class="agent-card terminal strategist-border scan">
-            <header class="agent-header strategist-color">
+          <article id="card-alex" class="helper-card terminal alex-border scan">
+            <header class="helper-header alex-color">
               <div class="flex items-center gap-2">
                 <span class="w-2 h-2 rounded-full" style="background:#34f7a1; box-shadow:0 0 8px #34f7a1"></span>
-                AGENT 01 :: STRATEGIST
+                HELPER 1 :: ALEX
               </div>
-              <span class="text-white/30" id="t-strategist">idle</span>
+              <span class="text-white/30" id="t-alex">waiting</span>
             </header>
-            <div class="agent-stream strategist-color scroller p-4 h-[420px] overflow-y-auto" id="stream-strategist"
-                 data-placeholder="// awaiting deployment...
-// will analyze BUSINESS BENEFITS, revenue levers,
-// market positioning gains, competitive advantages.
+            <div class="helper-stream alex-color scroller p-4 h-[420px] overflow-y-auto" id="stream-alex"
+                 data-placeholder="// waiting...
+// Alex will look at the PDF and list the good points.
 "></div>
           </article>
 
-          <!-- Red Team -->
-          <article id="card-red_team" class="agent-card terminal red-team-border">
-            <header class="agent-header red-team-color">
+          <article id="card-sam" class="helper-card terminal sam-border">
+            <header class="helper-header sam-color">
               <div class="flex items-center gap-2">
                 <span class="w-2 h-2 rounded-full" style="background:#ff5577; box-shadow:0 0 8px #ff5577"></span>
-                AGENT 02 :: RED TEAM
+                HELPER 2 :: SAM
               </div>
-              <span class="text-white/30" id="t-red_team">idle</span>
+              <span class="text-white/30" id="t-sam">waiting</span>
             </header>
-            <div class="agent-stream red-team-color scroller p-4 h-[420px] overflow-y-auto" id="stream-red_team"
-                 data-placeholder="// armed and waiting...
-// will dismantle Strategist's claims,
-// expose loopholes, indemnification traps,
-// jurisdictional risk, IP exposure.
+            <div class="helper-stream sam-color scroller p-4 h-[420px] overflow-y-auto" id="stream-sam"
+                 data-placeholder="// waiting...
+// Sam will read Alex first, then list the problems.
 "></div>
           </article>
 
-          <!-- Judge -->
-          <article id="card-judge" class="agent-card terminal judge-border">
-            <header class="agent-header judge-color">
+          <article id="card-maya" class="helper-card terminal maya-border">
+            <header class="helper-header maya-color">
               <div class="flex items-center gap-2">
                 <span class="w-2 h-2 rounded-full" style="background:#ffd166; box-shadow:0 0 8px #ffd166"></span>
-                AGENT 03 :: JUDGE
+                HELPER 3 :: MAYA
               </div>
-              <span class="text-white/30" id="t-judge">idle</span>
+              <span class="text-white/30" id="t-maya">waiting</span>
             </header>
-            <div class="agent-stream judge-color scroller p-4 h-[420px] overflow-y-auto" id="stream-judge"
-                 data-placeholder="// silent until both parties have spoken.
-// will render: RISK MATRIX + FINAL VERDICT.
+            <div class="helper-stream maya-color scroller p-4 h-[420px] overflow-y-auto" id="stream-maya"
+                 data-placeholder="// waiting for Alex and Sam to finish.
+// Then Maya gives the answer with a JSON block.
 "></div>
           </article>
         </div>
 
-        <!-- LOG TAIL -->
         <div class="mt-4 font-mono text-[11px] text-white/40" id="logTail">
-          <span class="text-white/30">[system]</span> tribunal idle. submit a brief to begin.
+          <span class="text-white/30">[info]</span> ready. Add your key and a PDF to start.
         </div>
       </div>
     </section>
   </div>
 
   <footer class="mt-12 mb-6 text-center text-[11px] font-mono text-white/30 tracking-[0.2em]">
-    THE AEGIS // CORPORATE WAR ROOM // BYOK-ENFORCED // © CLASSIFIED OPERATIONS
+    THE AEGIS // BRING YOUR OWN KEY // SIMPLE · SAFE · FAST
   </footer>
 </main>
+
+<!-- ARCHIVE DRAWER -->
+<div id="drawerBackdrop" class="drawer-backdrop fixed inset-0 bg-black/60 z-50"></div>
+<aside id="drawer" class="drawer fixed top-0 right-0 bottom-0 z-[60] w-full sm:w-[480px] glass-strong border-l border-white/10 flex flex-col">
+  <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
+    <div>
+      <div class="text-[10px] font-mono tracking-[0.24em] text-white/40">// PAST CHECKS</div>
+      <h3 class="text-lg font-bold">Your Saved Answers</h3>
+    </div>
+    <button id="closeDrawer" class="chip clickable">CLOSE</button>
+  </div>
+  <div id="archiveBody" class="flex-1 overflow-y-auto scroller p-4 space-y-3">
+    <div class="text-white/40 text-xs font-mono">loading...</div>
+  </div>
+</aside>
+
+<!-- TOAST -->
+<div id="toast" class="toast"></div>
 
 <script>
 (() => {
@@ -445,47 +529,59 @@
   const dropZone = $('dropZone');
   const fileLabel = $('fileLabel');
   const fileChip = $('fileChip');
+  const modelSelect = $('modelSelect');
+  const forceToggle = $('forceToggle');
   const deployBtn = $('deployBtn');
+  const cancelBtn = $('cancelBtn');
   const statusDot = $('statusDot');
   const statusText = $('statusText');
   const timer = $('timer');
+  const tokenMeter = $('tokenMeter');
   const logTail = $('logTail');
   const verdictBanner = $('verdictBanner');
   const verdictText = $('verdictText');
   const verdictMeta = $('verdictMeta');
   const verdictIcon = $('verdictIcon');
+  const verdictHeadline = $('verdictHeadline');
+  const verdictConditions = $('verdictConditions');
   const cacheChip = $('cacheChip');
+  const truncChip = $('truncChip');
+  const exportBtn = $('exportBtn');
+  const gaugeFill = $('gaugeFill');
+  const gaugeScore = $('gaugeScore');
+  const riskMatrixWrap = $('riskMatrixWrap');
+  const riskMatrixBody = $('riskMatrixBody');
+  const drawer = $('drawer');
+  const drawerBackdrop = $('drawerBackdrop');
+  const archiveBody = $('archiveBody');
+  const toastEl = $('toast');
 
-  const streams = {
-    strategist: $('stream-strategist'),
-    red_team: $('stream-red_team'),
-    judge: $('stream-judge'),
-  };
-  const cards = {
-    strategist: $('card-strategist'),
-    red_team: $('card-red_team'),
-    judge: $('card-judge'),
-  };
-  const tags = {
-    strategist: $('t-strategist'),
-    red_team: $('t-red_team'),
-    judge: $('t-judge'),
-  };
+  const streams = { alex: $('stream-alex'), sam: $('stream-sam'), maya: $('stream-maya') };
+  const cards   = { alex: $('card-alex'),   sam: $('card-sam'),   maya: $('card-maya')   };
+  const tags    = { alex: $('t-alex'),      sam: $('t-sam'),      maya: $('t-maya')      };
 
-  // Placeholders
   Object.values(streams).forEach(el => { el.textContent = el.dataset.placeholder || ''; });
 
   let selectedFile = null;
   let socket = null;
   let timerHandle = null;
   let startTs = 0;
+  let totalTokens = 0;
+  let lastVerdict = null;
+  const GAUGE_C = 2 * Math.PI * 52;
 
   function setStatus(text, mode) {
     statusText.textContent = text;
     statusDot.className = 'pulse-dot ' + (mode || 'idle');
   }
-  function log(msg, tag = 'system') {
+  function log(msg, tag = 'info') {
     logTail.innerHTML = `<span class="text-white/30">[${tag}]</span> ${msg}`;
+  }
+  function toast(msg, kind = 'ok') {
+    toastEl.textContent = msg;
+    toastEl.className = `toast show ${kind}`;
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => { toastEl.className = 'toast'; }, 4200);
   }
   function updateDeployable() {
     deployBtn.disabled = !(apiKey.value.trim() && selectedFile);
@@ -495,23 +591,21 @@
   toggleKey.addEventListener('click', () => {
     const showing = apiKey.type === 'text';
     apiKey.type = showing ? 'password' : 'text';
-    toggleKey.textContent = showing ? 'REVEAL' : 'HIDE';
+    toggleKey.textContent = showing ? 'SHOW' : 'HIDE';
   });
   apiKey.addEventListener('input', updateDeployable);
 
   function pickFile(file) {
     if (!file) return;
     if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
-      log('rejected: only PDF documents are accepted.', 'error');
-      return;
+      toast('please choose a PDF file', 'error'); return;
     }
     selectedFile = file;
     fileLabel.textContent = `${file.name} • ${(file.size/1024).toFixed(1)} KB`;
     fileChip.classList.remove('hidden');
-    log(`document staged → <span class="text-white/70">${file.name}</span>`, 'intel');
+    log(`file ready → <span class="text-white/70">${file.name}</span>`, 'file');
     updateDeployable();
   }
-
   pdfFile.addEventListener('change', (e) => pickFile(e.target.files[0]));
   ['dragenter','dragover'].forEach(ev => dropZone.addEventListener(ev, e => {
     e.preventDefault(); e.stopPropagation(); dropZone.classList.add('drag');
@@ -519,38 +613,61 @@
   ['dragleave','drop'].forEach(ev => dropZone.addEventListener(ev, e => {
     e.preventDefault(); e.stopPropagation(); dropZone.classList.remove('drag');
   }));
-  dropZone.addEventListener('drop', (e) => {
-    const f = e.dataTransfer.files && e.dataTransfer.files[0];
-    pickFile(f);
-  });
+  dropZone.addEventListener('drop', e => pickFile(e.dataTransfer.files && e.dataTransfer.files[0]));
 
   $('clearBtn').addEventListener('click', resetTerminals);
+  exportBtn.addEventListener('click', () => {
+    if (!lastVerdict) return;
+    const blob = new Blob([JSON.stringify(lastVerdict, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `aegis-${(lastVerdict.filename || 'doc').replace(/\.pdf$/i,'')}-${Date.now()}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    toast('answer saved as JSON', 'ok');
+  });
 
   function resetTerminals() {
-    Object.entries(streams).forEach(([k, el]) => {
+    Object.entries(streams).forEach(([, el]) => {
       el.classList.remove('cursor');
       el.textContent = el.dataset.placeholder || '';
     });
     Object.values(cards).forEach(c => c.classList.remove('active'));
-    Object.values(tags).forEach(t => { t.textContent = 'idle'; t.className = 'text-white/30'; });
+    Object.values(tags).forEach(t => { t.textContent = 'waiting'; t.className = 'text-white/30'; });
     verdictBanner.classList.add('hidden');
     verdictBanner.classList.remove('verdict-go','verdict-nogo','verdict-cond');
     cacheChip.classList.add('hidden');
+    truncChip.classList.add('hidden');
+    exportBtn.classList.add('hidden');
+    riskMatrixWrap.classList.add('hidden');
+    verdictConditions.classList.add('hidden');
+    riskMatrixBody.innerHTML = '';
+    totalTokens = 0; tokenMeter.textContent = '0';
+    timer.textContent = '00.00s';
+    gaugeFill.style.strokeDashoffset = GAUGE_C;
+    gaugeScore.textContent = '0';
+    lastVerdict = null;
   }
 
-  function activateAgent(id, name) {
+  function activateHelper(id, name) {
     Object.values(cards).forEach(c => c.classList.remove('active'));
     cards[id].classList.add('active');
     streams[id].textContent = '';
     streams[id].classList.add('cursor');
-    tags[id].textContent = 'transmitting';
+    tags[id].textContent = 'talking';
     tags[id].className = '';
-    log(`${name} online — streaming live`, id);
+    log(`${name} is talking`, id);
   }
-  function finishAgent(id) {
+  function finishHelper(id, info) {
     streams[id].classList.remove('cursor');
-    tags[id].textContent = 'sealed';
+    const t = info && info.est_tokens ? ` • ~${info.est_tokens.toLocaleString()} words` : '';
+    tags[id].textContent = 'done' + t;
     tags[id].className = 'text-white/50';
+    if (info && info.est_tokens) {
+      totalTokens += info.est_tokens;
+      tokenMeter.textContent = totalTokens.toLocaleString();
+    }
   }
   function appendToken(id, token) {
     const el = streams[id];
@@ -565,83 +682,146 @@
       timer.textContent = `${s.padStart(5,'0')}s`;
     }, 60);
   }
-  function stopTimer() {
-    if (timerHandle) clearInterval(timerHandle);
-    timerHandle = null;
+  function stopTimer() { if (timerHandle) clearInterval(timerHandle); timerHandle = null; }
+
+  function gaugeColor(score) {
+    if (score <= 33) return '#34f7a1';
+    if (score <= 66) return '#ffb020';
+    return '#ff5577';
+  }
+  function renderGauge(score) {
+    const clamped = Math.max(0, Math.min(100, score|0));
+    gaugeFill.style.stroke = gaugeColor(clamped);
+    gaugeFill.style.strokeDashoffset = GAUGE_C * (1 - clamped / 100);
+    gaugeScore.textContent = clamped;
+  }
+  function sevClass(s) {
+    s = (s||'').toLowerCase();
+    if (s.startsWith('h')) return 'sev-high';
+    if (s.startsWith('m')) return 'sev-med';
+    return 'sev-low';
+  }
+  function renderRiskMatrix(risks) {
+    if (!Array.isArray(risks) || !risks.length) { riskMatrixWrap.classList.add('hidden'); return; }
+    riskMatrixBody.innerHTML = '';
+    risks.forEach(r => {
+      const tr = document.createElement('tr');
+      tr.className = 'risk-row border-t border-white/5 align-top';
+      tr.innerHTML = `
+        <td class="px-3 py-2.5 text-white/85">${escapeHtml(r.risk||'')}</td>
+        <td class="px-3 py-2.5"><span class="sev-badge ${sevClass(r.likelihood)}">${escapeHtml(r.likelihood||'')}</span></td>
+        <td class="px-3 py-2.5"><span class="sev-badge ${sevClass(r.impact)}">${escapeHtml(r.impact||'')}</span></td>
+        <td class="px-3 py-2.5 text-white/65 text-[13px]">${escapeHtml(r.mitigation||'')}</td>`;
+      riskMatrixBody.appendChild(tr);
+    });
+    riskMatrixWrap.classList.remove('hidden');
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function friendlyVerdict(v) {
+    if (v === 'GO') return 'YES';
+    if (v === 'NO-GO') return 'NO';
+    if (v === 'CONDITIONAL-GO') return 'MAYBE';
+    return v || '—';
   }
 
-  function renderVerdict(verdict, meta) {
-    const v = (verdict || '').toUpperCase();
+  function renderVerdict(msg) {
+    const v = (msg.verdict || '').toUpperCase();
     let cls = 'verdict-cond', icon = '⚖', color = 'text-amber-300';
     if (v === 'GO') { cls = 'verdict-go'; icon = '✓'; color = 'text-emerald-300'; }
     else if (v === 'NO-GO') { cls = 'verdict-nogo'; icon = '✕'; color = 'text-rose-300'; }
     verdictBanner.classList.remove('hidden','verdict-go','verdict-nogo','verdict-cond');
     verdictBanner.classList.add(cls);
-    verdictText.textContent = v || '—';
+    verdictText.textContent = friendlyVerdict(v);
     verdictText.className = `text-3xl font-extrabold tracking-tight ${color}`;
     verdictIcon.textContent = icon;
-    verdictIcon.className = `w-12 h-12 rounded-xl flex items-center justify-center text-2xl font-extrabold ${color}`;
-    verdictMeta.textContent = meta || '';
+    verdictIcon.className = `text-2xl ${color}`;
+    verdictHeadline.textContent = msg.headline || '';
+
+    const parts = [];
+    if (msg.model) parts.push(msg.model);
+    if (msg.cached) parts.push(`from cache • first run was ${msg.original_time}s`);
+    else parts.push(`done in ${msg.execution_time}s`);
+    if (typeof msg.total_tokens === 'number') parts.push(`~${msg.total_tokens.toLocaleString()} words`);
+    if (typeof msg.estimated_cost_usd === 'number' && msg.estimated_cost_usd > 0)
+      parts.push(`≈ $${msg.estimated_cost_usd.toFixed(4)}`);
+    verdictMeta.textContent = parts.join(' · ');
+
+    renderGauge(msg.risk_score || 0);
+
+    const struct = msg.structured || {};
+    renderRiskMatrix(struct.risks || []);
+
+    if (v === 'CONDITIONAL-GO' && Array.isArray(struct.conditions) && struct.conditions.length) {
+      verdictConditions.innerHTML = 'RULES TO FIX: ' + struct.conditions.map(escapeHtml).join(' • ');
+      verdictConditions.classList.remove('hidden');
+    }
+
+    lastVerdict = { ...msg };
+    exportBtn.classList.remove('hidden');
   }
 
+  // ---- WebSocket flow ------------------------------------------------------
   deployBtn.addEventListener('click', () => {
     if (!apiKey.value.trim() || !selectedFile) return;
     resetTerminals();
     deployBtn.disabled = true;
-    setStatus('ESTABLISHING ENCRYPTED SOCKET...', 'live');
-    log('handshake initiated → /ws/analyze', 'socket');
+    cancelBtn.disabled = false;
+    setStatus('CONNECTING...', 'live');
+    log('opening live link → /ws/analyze', 'link');
 
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     socket = new WebSocket(`${proto}://${location.host}/ws/analyze`);
     socket.binaryType = 'arraybuffer';
 
     socket.addEventListener('open', async () => {
-      setStatus('TRANSMITTING BRIEF...', 'live');
+      setStatus('SENDING FILE...', 'live');
       socket.send(JSON.stringify({
         api_key: apiKey.value.trim(),
         filename: selectedFile.name,
+        model: modelSelect.value,
+        force: forceToggle.checked,
       }));
       const buf = await selectedFile.arrayBuffer();
       socket.send(buf);
       startTimer();
-      setStatus('TRIBUNAL CONVENED // STREAMING', 'live');
+      setStatus('HELPERS ARE TALKING', 'live');
     });
 
     socket.addEventListener('message', (ev) => {
       let msg; try { msg = JSON.parse(ev.data); } catch { return; }
       switch (msg.type) {
-        case 'status':
-          log(msg.message, 'status');
+        case 'status': log(msg.message, 'info'); break;
+        case 'warning':
+          toast(msg.message, 'warn'); log(msg.message, 'warn'); break;
+        case 'doc_meta':
+          if (msg.truncated) truncChip.classList.remove('hidden');
+          log(`file: ${msg.chars.toLocaleString()} letters total, reading ${msg.analyzed_chars.toLocaleString()} • ${msg.model}`, 'file');
           break;
         case 'cache_hit':
           cacheChip.classList.remove('hidden');
-          log(`cache hit → replaying verdict (original run ${msg.original_time}s)`, 'cache');
+          if (msg.truncated) truncChip.classList.remove('hidden');
+          log(`found in cache → showing saved answer (first run was ${msg.original_time}s • ${msg.model})`, 'cache');
           break;
-        case 'agent_start':
-          activateAgent(msg.agent, msg.name);
-          break;
-        case 'agent_token':
-          appendToken(msg.agent, msg.token);
-          break;
-        case 'agent_end':
-          finishAgent(msg.agent);
-          break;
-        case 'verdict': {
+        case 'helper_start': activateHelper(msg.helper, msg.name); break;
+        case 'helper_token': appendToken(msg.helper, msg.token); break;
+        case 'helper_end': finishHelper(msg.helper, msg); break;
+        case 'verdict':
           stopTimer();
-          const meta = msg.cached
-            ? `served from cache • original tribunal: ${msg.original_time}s`
-            : `tribunal completed in ${msg.execution_time}s`;
-          renderVerdict(msg.verdict, meta);
-          setStatus(msg.cached ? 'CACHE HIT // INSTANT' : 'TRIBUNAL SEALED', 'live');
-          log(`verdict rendered → <strong>${msg.verdict}</strong>`, 'judge');
-          deployBtn.disabled = false;
+          renderVerdict(msg);
+          setStatus(msg.cached ? 'FROM CACHE • FAST' : 'ALL DONE', 'live');
+          log(`answer ready → <strong>${friendlyVerdict(msg.verdict)}</strong> (risk ${msg.risk_score})`, 'maya');
+          toast(`answer: ${friendlyVerdict(msg.verdict)} • risk ${msg.risk_score}`,
+                msg.verdict === 'GO' ? 'ok' : msg.verdict === 'NO-GO' ? 'error' : 'warn');
+          deployBtn.disabled = false; cancelBtn.disabled = true;
           break;
-        }
         case 'fatal':
           stopTimer();
-          setStatus('TRIBUNAL ABORTED', 'err');
-          log(`fatal → ${msg.message}`, 'error');
-          deployBtn.disabled = false;
+          setStatus('STOPPED', 'err');
+          log(`error → ${msg.message}`, 'error');
+          toast(msg.message, 'error');
+          deployBtn.disabled = false; cancelBtn.disabled = true;
           break;
       }
     });
@@ -649,13 +829,77 @@
     socket.addEventListener('close', () => {
       stopTimer();
       Object.values(streams).forEach(el => el.classList.remove('cursor'));
-      deployBtn.disabled = false;
+      deployBtn.disabled = false; cancelBtn.disabled = true;
     });
     socket.addEventListener('error', () => {
-      setStatus('SOCKET ERROR', 'err');
-      log('websocket error', 'error');
+      setStatus('LINK ERROR', 'err');
+      log('link error', 'error');
+      toast('link error', 'error');
     });
   });
+
+  cancelBtn.addEventListener('click', () => {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.close(4000, 'user-stop');
+      setStatus('STOPPED BY YOU', 'err');
+      log('you stopped the check', 'stop');
+      toast('check stopped', 'warn');
+    }
+  });
+
+  // ---- Past Checks drawer --------------------------------------------------
+  function openDrawer() { drawer.classList.add('open'); drawerBackdrop.classList.add('open'); loadArchive(); }
+  function closeDrawer() { drawer.classList.remove('open'); drawerBackdrop.classList.remove('open'); }
+  $('openHistory').addEventListener('click', openDrawer);
+  $('closeDrawer').addEventListener('click', closeDrawer);
+  drawerBackdrop.addEventListener('click', closeDrawer);
+
+  async function loadArchive() {
+    archiveBody.innerHTML = '<div class="text-white/40 text-xs font-mono">loading...</div>';
+    try {
+      const r = await fetch('/api/history?limit=30');
+      const rows = await r.json();
+      if (!rows.length) {
+        archiveBody.innerHTML = '<div class="text-white/40 text-xs font-mono">no saved checks yet — run one to see it here.</div>';
+        return;
+      }
+      archiveBody.innerHTML = '';
+      rows.forEach(row => {
+        const card = document.createElement('div');
+        const cls = row.verdict === 'GO' ? 'border-emerald-400/30' :
+                    row.verdict === 'NO-GO' ? 'border-rose-400/30' : 'border-amber-400/30';
+        card.className = `hist-card glass rounded-xl p-3 border ${cls}`;
+        const color = row.verdict === 'GO' ? 'text-emerald-300' :
+                      row.verdict === 'NO-GO' ? 'text-rose-300' : 'text-amber-300';
+        card.innerHTML = `
+          <div class="flex items-center justify-between">
+            <div class="text-sm font-semibold truncate" title="${escapeHtml(row.filename)}">${escapeHtml(row.filename)}</div>
+            <button class="chip clickable text-white/40 hover:text-rose-300" data-del="${row.id}">DELETE</button>
+          </div>
+          <div class="flex items-center gap-3 mt-2">
+            <span class="text-2xl font-extrabold ${color}">${friendlyVerdict(row.verdict)}</span>
+            <span class="chip">risk ${row.risk_score}</span>
+            <span class="chip">${row.model}</span>
+          </div>
+          <div class="text-[11px] text-white/50 mt-2 leading-snug">${escapeHtml(row.headline || '')}</div>
+          <div class="text-[10px] font-mono text-white/30 mt-2">
+            ${row.execution_time}s · ~${(row.total_tokens||0).toLocaleString()} words · ${row.created_at || ''}
+          </div>`;
+        archiveBody.appendChild(card);
+      });
+      archiveBody.querySelectorAll('[data-del]').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const id = btn.getAttribute('data-del');
+          await fetch(`/api/cache/${id}`, { method: 'DELETE' });
+          toast(`deleted record ${id}`, 'ok');
+          loadArchive();
+        });
+      });
+    } catch (err) {
+      archiveBody.innerHTML = `<div class="text-rose-300 text-xs font-mono">could not load past checks: ${escapeHtml(err.message)}</div>`;
+    }
+  }
 
   updateDeployable();
 })();
