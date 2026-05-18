@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+websockets
+python-multipart
+sqlalchemy
+langchain
+langchain-google-genai
+pypdf
+jinja2

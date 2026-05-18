@@ -1,0 +1,664 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Aegis :: Classified Tribunal Console</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --panel: rgba(18, 18, 22, 0.55);
+    --panel-strong: rgba(22, 22, 28, 0.78);
+    --border: rgba(255, 255, 255, 0.06);
+    --border-glow: rgba(0, 229, 255, 0.35);
+    --cyan: #00e5ff;
+    --amber: #ffb020;
+    --rose: #ff3860;
+    --green: #34f7a1;
+    --violet: #b388ff;
+    --muted: #8a8d96;
+  }
+  html, body { background: var(--bg); color: #e7e9ee; font-family: 'Inter', system-ui, sans-serif; }
+  .font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+  /* Ambient background */
+  body::before {
+    content: "";
+    position: fixed; inset: 0; z-index: -2;
+    background:
+      radial-gradient(1100px 700px at 12% -10%, rgba(0,229,255,0.10), transparent 60%),
+      radial-gradient(900px 600px at 110% 10%, rgba(179,136,255,0.10), transparent 60%),
+      radial-gradient(800px 500px at 50% 120%, rgba(255,56,96,0.08), transparent 60%),
+      #050507;
+  }
+  body::after {
+    content: "";
+    position: fixed; inset: 0; z-index: -1;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: radial-gradient(ellipse at center, black 50%, transparent 100%);
+  }
+
+  .glass {
+    background: var(--panel);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid var(--border);
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.04) inset,
+      0 0 0 1px rgba(255,255,255,0.02),
+      0 30px 80px -30px rgba(0,0,0,0.85);
+  }
+  .glass-strong {
+    background: var(--panel-strong);
+    backdrop-filter: blur(22px) saturate(160%);
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .glow-cyan { box-shadow: 0 0 30px -10px var(--cyan), 0 0 1px var(--cyan) inset; }
+  .glow-rose { box-shadow: 0 0 30px -10px var(--rose), 0 0 1px var(--rose) inset; }
+  .glow-amber { box-shadow: 0 0 30px -10px var(--amber), 0 0 1px var(--amber) inset; }
+  .glow-green { box-shadow: 0 0 30px -10px var(--green), 0 0 1px var(--green) inset; }
+
+  /* Hero title */
+  .title-grad {
+    background: linear-gradient(180deg, #ffffff 0%, #b8c0ce 60%, #6b7280 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .accent-grad {
+    background: linear-gradient(90deg, #00e5ff 0%, #b388ff 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+
+  /* Deploy button */
+  .deploy-btn {
+    position: relative; overflow: hidden;
+    background: linear-gradient(135deg, #00e5ff 0%, #6c8cff 50%, #b388ff 100%);
+    color: #0a0a0a;
+    transition: transform .15s ease, box-shadow .3s ease, filter .2s ease;
+    box-shadow:
+      0 10px 40px -10px rgba(0,229,255,0.55),
+      0 0 0 1px rgba(255,255,255,0.15) inset;
+  }
+  .deploy-btn:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.08); }
+  .deploy-btn:disabled { opacity: .55; cursor: not-allowed; filter: grayscale(.4); }
+  .deploy-btn .shine {
+    position: absolute; top: 0; left: -120%; width: 60%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent);
+    transform: skewX(-20deg);
+    animation: shine 3.4s ease-in-out infinite;
+  }
+  @keyframes shine { 0% { left: -120%; } 60% { left: 220%; } 100% { left: 220%; } }
+
+  /* Drop zone */
+  .drop-zone { transition: border-color .2s ease, background .2s ease, transform .2s ease; }
+  .drop-zone.drag { border-color: var(--cyan); background: rgba(0,229,255,0.05); transform: scale(1.01); }
+
+  /* Status pill */
+  .pulse-dot { width: 8px; height: 8px; border-radius: 999px; display: inline-block; }
+  .pulse-dot.live { background: var(--green); box-shadow: 0 0 12px var(--green); animation: pulse 1.4s infinite; }
+  .pulse-dot.idle { background: #444; }
+  .pulse-dot.err  { background: var(--rose); box-shadow: 0 0 10px var(--rose); }
+  @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.35 } }
+
+  /* Terminal */
+  .terminal {
+    background:
+      linear-gradient(180deg, rgba(0,0,0,0.55), rgba(0,0,0,0.78)),
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0 1px, transparent 1px 3px);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 14px;
+  }
+  .agent-stream {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .strategist-color { color: #34f7a1; }
+  .red-team-color  { color: #ff5577; }
+  .judge-color     { color: #ffd166; }
+  .strategist-border { border-color: rgba(52,247,161,0.35); }
+  .red-team-border  { border-color: rgba(255,85,119,0.35); }
+  .judge-border     { border-color: rgba(255,209,102,0.35); }
+
+  .agent-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .14em;
+    text-transform: uppercase;
+  }
+
+  .scan {
+    position: relative; overflow: hidden;
+  }
+  .scan::before {
+    content: ""; position: absolute; left: 0; right: 0; height: 2px; top: 0;
+    background: linear-gradient(90deg, transparent, rgba(0,229,255,.55), transparent);
+    animation: scanline 2.2s linear infinite;
+    pointer-events: none;
+  }
+  @keyframes scanline { 0% { top: -2px } 100% { top: 100% } }
+
+  .cursor::after {
+    content: "▍"; display: inline-block; margin-left: 2px; opacity: .8;
+    animation: blink 1s steps(1) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0 } }
+
+  /* Markdown-ish table tweaks */
+  .agent-stream table { border-collapse: collapse; margin: 8px 0; width: 100%; }
+  .agent-stream th, .agent-stream td { border: 1px solid rgba(255,255,255,0.1); padding: 6px 10px; }
+  .agent-stream th { background: rgba(255,255,255,0.04); }
+
+  /* Verdict banner */
+  .verdict-card {
+    background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .verdict-go    { border-color: rgba(52,247,161,0.5); box-shadow: 0 0 60px -20px var(--green); }
+  .verdict-nogo  { border-color: rgba(255,56,96,0.55); box-shadow: 0 0 60px -20px var(--rose); }
+  .verdict-cond  { border-color: rgba(255,176,32,0.55); box-shadow: 0 0 60px -20px var(--amber); }
+
+  /* Custom scrollbar */
+  .scroller::-webkit-scrollbar { width: 10px; }
+  .scroller::-webkit-scrollbar-track { background: transparent; }
+  .scroller::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.08); border-radius: 999px; border: 2px solid transparent; background-clip: content-box;
+  }
+  .scroller::-webkit-scrollbar-thumb:hover { background: rgba(0,229,255,0.35); background-clip: content-box; }
+
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 999px;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .12em;
+    text-transform: uppercase; border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.03);
+  }
+
+  .key-input {
+    background: rgba(0,0,0,0.55);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #e7e9ee;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: .15em;
+  }
+  .key-input:focus { outline: none; border-color: var(--cyan); box-shadow: 0 0 0 4px rgba(0,229,255,0.08); }
+
+  .agent-card { transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease; }
+  .agent-card.active { transform: translateY(-2px); }
+  .agent-card.active.strategist-border { box-shadow: 0 0 40px -15px #34f7a1; }
+  .agent-card.active.red-team-border  { box-shadow: 0 0 40px -15px #ff5577; }
+  .agent-card.active.judge-border     { box-shadow: 0 0 40px -15px #ffd166; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- TOP BAR -->
+<header class="sticky top-0 z-40 glass-strong border-b border-white/5">
+  <div class="max-w-[1400px] mx-auto px-6 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg flex items-center justify-center glow-cyan"
+           style="background: linear-gradient(135deg, #00e5ff, #b388ff);">
+        <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="#0a0a0a" stroke-width="2.2">
+          <path d="M12 2 4 5v7c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V5l-8-3Z"/>
+        </svg>
+      </div>
+      <div>
+        <div class="text-[10px] font-mono tracking-[0.28em] text-white/40">CLASSIFIED // TIER-Ω</div>
+        <div class="text-lg font-extrabold tracking-tight">THE AEGIS<span class="accent-grad"> ::</span> Tribunal Console</div>
+      </div>
+    </div>
+    <div class="hidden md:flex items-center gap-3 text-xs font-mono text-white/60">
+      <span class="chip"><span class="pulse-dot live"></span> SOCKET</span>
+      <span class="chip">MODEL: gemini-1.5-flash</span>
+      <span class="chip">BYOK ENFORCED</span>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-[1400px] mx-auto px-6 py-10">
+
+  <!-- HERO -->
+  <section class="mb-10">
+    <div class="flex items-center gap-2 mb-3">
+      <span class="chip"><span class="pulse-dot live"></span> LIVE</span>
+      <span class="chip">MULTI-AGENT TRIBUNAL</span>
+      <span class="chip">ZERO-RETENTION</span>
+    </div>
+    <h1 class="text-5xl md:text-6xl font-extrabold leading-[1.05] tracking-tight title-grad">
+      Convene the tribunal.<br/>
+      <span class="accent-grad">Decide in seconds.</span>
+    </h1>
+    <p class="mt-4 max-w-2xl text-white/60 text-[15px] leading-relaxed">
+      Three adversarial AI agents — Strategist, Red Team, Judge — argue your contract
+      in a live war-room terminal. Output is a binding risk matrix and a single
+      <span class="font-mono text-white/90">GO / NO-GO</span> verdict, cached for instant replay.
+    </p>
+  </section>
+
+  <!-- WORKSPACE -->
+  <div class="grid grid-cols-12 gap-6">
+
+    <!-- LEFT: CONTROL PANEL -->
+    <aside class="col-span-12 lg:col-span-4">
+      <div class="glass rounded-2xl p-6">
+        <div class="flex items-center justify-between mb-5">
+          <div>
+            <div class="text-[10px] font-mono tracking-[0.24em] text-white/40">// CONTROL PANEL</div>
+            <h2 class="text-xl font-bold mt-1">Deployment Brief</h2>
+          </div>
+          <div class="text-[10px] font-mono text-white/40">ENC-AES-256</div>
+        </div>
+
+        <!-- API KEY -->
+        <label class="block">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-semibold tracking-wide flex items-center gap-2">
+              <svg class="w-4 h-4 text-cyan-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2 13 10"/><path d="m17 6 4 4"/><circle cx="9" cy="15" r="6"/></svg>
+              Gemini API Key
+              <span class="chip" style="border-color: rgba(0,229,255,0.4); color: #9ef0ff;">BYOK</span>
+            </span>
+            <button type="button" id="toggleKey" class="text-[11px] font-mono text-white/50 hover:text-cyan-300 transition">REVEAL</button>
+          </div>
+          <div class="relative">
+            <input id="apiKey" type="password" autocomplete="off" spellcheck="false"
+                   placeholder="AIza••••••••••••••••••••••••••••••"
+                   class="key-input w-full rounded-xl px-4 py-3 pr-10 text-sm"/>
+            <span class="absolute right-3 top-1/2 -translate-y-1/2 pulse-dot idle" id="keyDot"></span>
+          </div>
+          <p class="mt-2 text-[11px] text-white/40 font-mono">
+            Never stored. Never logged. Sent only to Google's endpoint for this session.
+          </p>
+        </label>
+
+        <!-- FILE DROP -->
+        <div class="mt-6">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-semibold tracking-wide flex items-center gap-2">
+              <svg class="w-4 h-4 text-violet-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+              Target Document
+            </span>
+            <span id="fileChip" class="chip hidden">PDF LOADED</span>
+          </div>
+
+          <label id="dropZone" for="pdfFile"
+                 class="drop-zone block rounded-xl border border-dashed border-white/15 bg-white/[0.02]
+                        px-4 py-8 text-center cursor-pointer hover:border-cyan-400/40">
+            <div class="flex flex-col items-center gap-3">
+              <div class="w-12 h-12 rounded-xl flex items-center justify-center"
+                   style="background: rgba(0,229,255,0.07); border: 1px solid rgba(0,229,255,0.25);">
+                <svg class="w-6 h-6 text-cyan-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8 12 3 7 8"/><path d="M12 3v12"/>
+                </svg>
+              </div>
+              <div>
+                <div class="text-sm font-semibold">Drop classified PDF here</div>
+                <div class="text-[11px] text-white/40 font-mono mt-1" id="fileLabel">or click to browse — max ~5MB</div>
+              </div>
+            </div>
+            <input id="pdfFile" type="file" accept="application/pdf" class="hidden"/>
+          </label>
+        </div>
+
+        <!-- DEPLOY -->
+        <button id="deployBtn" disabled
+                class="deploy-btn w-full mt-6 rounded-xl py-3.5 font-extrabold tracking-[0.18em] text-sm">
+          <span class="shine"></span>
+          DEPLOY THE AEGIS
+        </button>
+
+        <!-- STATUS -->
+        <div class="mt-5 flex items-center justify-between text-[11px] font-mono">
+          <div class="flex items-center gap-2 text-white/60">
+            <span id="statusDot" class="pulse-dot idle"></span>
+            <span id="statusText">STANDBY // AWAITING BRIEF</span>
+          </div>
+          <div id="timer" class="text-white/40">00.00s</div>
+        </div>
+      </div>
+
+      <!-- LEGEND -->
+      <div class="glass rounded-2xl p-5 mt-6">
+        <div class="text-[10px] font-mono tracking-[0.24em] text-white/40 mb-3">// AGENT REGISTRY</div>
+        <ul class="space-y-2 text-sm">
+          <li class="flex items-center gap-3"><span class="w-2 h-2 rounded-full" style="background:#34f7a1; box-shadow:0 0 10px #34f7a1"></span> <span class="font-semibold">Strategist</span> <span class="text-white/40 text-xs">— bullish business case</span></li>
+          <li class="flex items-center gap-3"><span class="w-2 h-2 rounded-full" style="background:#ff5577; box-shadow:0 0 10px #ff5577"></span> <span class="font-semibold">Red Team</span> <span class="text-white/40 text-xs">— adversarial counsel</span></li>
+          <li class="flex items-center gap-3"><span class="w-2 h-2 rounded-full" style="background:#ffd166; box-shadow:0 0 10px #ffd166"></span> <span class="font-semibold">Judge</span> <span class="text-white/40 text-xs">— risk matrix + verdict</span></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- RIGHT: TRIBUNAL TERMINAL -->
+    <section class="col-span-12 lg:col-span-8">
+      <div class="glass rounded-2xl p-5">
+
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-3">
+            <span class="flex gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-[#ff5f56]"></span>
+              <span class="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]"></span>
+              <span class="w-2.5 h-2.5 rounded-full bg-[#27c93f]"></span>
+            </span>
+            <div>
+              <div class="text-[10px] font-mono tracking-[0.24em] text-white/40">// LIVE TRIBUNAL</div>
+              <h2 class="text-lg font-bold">aegis@tribunal:~$ <span class="accent-grad">stream</span></h2>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span id="cacheChip" class="chip hidden" style="border-color: rgba(0,229,255,0.4); color:#9ef0ff;">CACHE HIT • INSTANT</span>
+            <button id="clearBtn" class="chip hover:text-rose-300 transition">CLEAR</button>
+          </div>
+        </div>
+
+        <!-- VERDICT BANNER -->
+        <div id="verdictBanner" class="verdict-card rounded-xl px-5 py-4 mb-5 hidden">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-[10px] font-mono tracking-[0.24em] text-white/40">// TRIBUNAL RULING</div>
+              <div class="flex items-baseline gap-3 mt-1">
+                <span id="verdictText" class="text-3xl font-extrabold tracking-tight">—</span>
+                <span id="verdictMeta" class="text-xs font-mono text-white/50"></span>
+              </div>
+            </div>
+            <div id="verdictIcon" class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl font-extrabold">·</div>
+          </div>
+        </div>
+
+        <!-- AGENT TERMINALS -->
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+
+          <!-- Strategist -->
+          <article id="card-strategist" class="agent-card terminal strategist-border scan">
+            <header class="agent-header strategist-color">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full" style="background:#34f7a1; box-shadow:0 0 8px #34f7a1"></span>
+                AGENT 01 :: STRATEGIST
+              </div>
+              <span class="text-white/30" id="t-strategist">idle</span>
+            </header>
+            <div class="agent-stream strategist-color scroller p-4 h-[420px] overflow-y-auto" id="stream-strategist"
+                 data-placeholder="// awaiting deployment...
+// will analyze BUSINESS BENEFITS, revenue levers,
+// market positioning gains, competitive advantages.
+"></div>
+          </article>
+
+          <!-- Red Team -->
+          <article id="card-red_team" class="agent-card terminal red-team-border">
+            <header class="agent-header red-team-color">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full" style="background:#ff5577; box-shadow:0 0 8px #ff5577"></span>
+                AGENT 02 :: RED TEAM
+              </div>
+              <span class="text-white/30" id="t-red_team">idle</span>
+            </header>
+            <div class="agent-stream red-team-color scroller p-4 h-[420px] overflow-y-auto" id="stream-red_team"
+                 data-placeholder="// armed and waiting...
+// will dismantle Strategist's claims,
+// expose loopholes, indemnification traps,
+// jurisdictional risk, IP exposure.
+"></div>
+          </article>
+
+          <!-- Judge -->
+          <article id="card-judge" class="agent-card terminal judge-border">
+            <header class="agent-header judge-color">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full" style="background:#ffd166; box-shadow:0 0 8px #ffd166"></span>
+                AGENT 03 :: JUDGE
+              </div>
+              <span class="text-white/30" id="t-judge">idle</span>
+            </header>
+            <div class="agent-stream judge-color scroller p-4 h-[420px] overflow-y-auto" id="stream-judge"
+                 data-placeholder="// silent until both parties have spoken.
+// will render: RISK MATRIX + FINAL VERDICT.
+"></div>
+          </article>
+        </div>
+
+        <!-- LOG TAIL -->
+        <div class="mt-4 font-mono text-[11px] text-white/40" id="logTail">
+          <span class="text-white/30">[system]</span> tribunal idle. submit a brief to begin.
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <footer class="mt-12 mb-6 text-center text-[11px] font-mono text-white/30 tracking-[0.2em]">
+    THE AEGIS // CORPORATE WAR ROOM // BYOK-ENFORCED // © CLASSIFIED OPERATIONS
+  </footer>
+</main>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const apiKey = $('apiKey');
+  const toggleKey = $('toggleKey');
+  const keyDot = $('keyDot');
+  const pdfFile = $('pdfFile');
+  const dropZone = $('dropZone');
+  const fileLabel = $('fileLabel');
+  const fileChip = $('fileChip');
+  const deployBtn = $('deployBtn');
+  const statusDot = $('statusDot');
+  const statusText = $('statusText');
+  const timer = $('timer');
+  const logTail = $('logTail');
+  const verdictBanner = $('verdictBanner');
+  const verdictText = $('verdictText');
+  const verdictMeta = $('verdictMeta');
+  const verdictIcon = $('verdictIcon');
+  const cacheChip = $('cacheChip');
+
+  const streams = {
+    strategist: $('stream-strategist'),
+    red_team: $('stream-red_team'),
+    judge: $('stream-judge'),
+  };
+  const cards = {
+    strategist: $('card-strategist'),
+    red_team: $('card-red_team'),
+    judge: $('card-judge'),
+  };
+  const tags = {
+    strategist: $('t-strategist'),
+    red_team: $('t-red_team'),
+    judge: $('t-judge'),
+  };
+
+  // Placeholders
+  Object.values(streams).forEach(el => { el.textContent = el.dataset.placeholder || ''; });
+
+  let selectedFile = null;
+  let socket = null;
+  let timerHandle = null;
+  let startTs = 0;
+
+  function setStatus(text, mode) {
+    statusText.textContent = text;
+    statusDot.className = 'pulse-dot ' + (mode || 'idle');
+  }
+  function log(msg, tag = 'system') {
+    logTail.innerHTML = `<span class="text-white/30">[${tag}]</span> ${msg}`;
+  }
+  function updateDeployable() {
+    deployBtn.disabled = !(apiKey.value.trim() && selectedFile);
+    keyDot.className = 'pulse-dot ' + (apiKey.value.trim() ? 'live' : 'idle');
+  }
+
+  toggleKey.addEventListener('click', () => {
+    const showing = apiKey.type === 'text';
+    apiKey.type = showing ? 'password' : 'text';
+    toggleKey.textContent = showing ? 'REVEAL' : 'HIDE';
+  });
+  apiKey.addEventListener('input', updateDeployable);
+
+  function pickFile(file) {
+    if (!file) return;
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      log('rejected: only PDF documents are accepted.', 'error');
+      return;
+    }
+    selectedFile = file;
+    fileLabel.textContent = `${file.name} • ${(file.size/1024).toFixed(1)} KB`;
+    fileChip.classList.remove('hidden');
+    log(`document staged → <span class="text-white/70">${file.name}</span>`, 'intel');
+    updateDeployable();
+  }
+
+  pdfFile.addEventListener('change', (e) => pickFile(e.target.files[0]));
+  ['dragenter','dragover'].forEach(ev => dropZone.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation(); dropZone.classList.add('drag');
+  }));
+  ['dragleave','drop'].forEach(ev => dropZone.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation(); dropZone.classList.remove('drag');
+  }));
+  dropZone.addEventListener('drop', (e) => {
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    pickFile(f);
+  });
+
+  $('clearBtn').addEventListener('click', resetTerminals);
+
+  function resetTerminals() {
+    Object.entries(streams).forEach(([k, el]) => {
+      el.classList.remove('cursor');
+      el.textContent = el.dataset.placeholder || '';
+    });
+    Object.values(cards).forEach(c => c.classList.remove('active'));
+    Object.values(tags).forEach(t => { t.textContent = 'idle'; t.className = 'text-white/30'; });
+    verdictBanner.classList.add('hidden');
+    verdictBanner.classList.remove('verdict-go','verdict-nogo','verdict-cond');
+    cacheChip.classList.add('hidden');
+  }
+
+  function activateAgent(id, name) {
+    Object.values(cards).forEach(c => c.classList.remove('active'));
+    cards[id].classList.add('active');
+    streams[id].textContent = '';
+    streams[id].classList.add('cursor');
+    tags[id].textContent = 'transmitting';
+    tags[id].className = '';
+    log(`${name} online — streaming live`, id);
+  }
+  function finishAgent(id) {
+    streams[id].classList.remove('cursor');
+    tags[id].textContent = 'sealed';
+    tags[id].className = 'text-white/50';
+  }
+  function appendToken(id, token) {
+    const el = streams[id];
+    el.textContent += token;
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function startTimer() {
+    startTs = performance.now();
+    timerHandle = setInterval(() => {
+      const s = ((performance.now() - startTs) / 1000).toFixed(2);
+      timer.textContent = `${s.padStart(5,'0')}s`;
+    }, 60);
+  }
+  function stopTimer() {
+    if (timerHandle) clearInterval(timerHandle);
+    timerHandle = null;
+  }
+
+  function renderVerdict(verdict, meta) {
+    const v = (verdict || '').toUpperCase();
+    let cls = 'verdict-cond', icon = '⚖', color = 'text-amber-300';
+    if (v === 'GO') { cls = 'verdict-go'; icon = '✓'; color = 'text-emerald-300'; }
+    else if (v === 'NO-GO') { cls = 'verdict-nogo'; icon = '✕'; color = 'text-rose-300'; }
+    verdictBanner.classList.remove('hidden','verdict-go','verdict-nogo','verdict-cond');
+    verdictBanner.classList.add(cls);
+    verdictText.textContent = v || '—';
+    verdictText.className = `text-3xl font-extrabold tracking-tight ${color}`;
+    verdictIcon.textContent = icon;
+    verdictIcon.className = `w-12 h-12 rounded-xl flex items-center justify-center text-2xl font-extrabold ${color}`;
+    verdictMeta.textContent = meta || '';
+  }
+
+  deployBtn.addEventListener('click', () => {
+    if (!apiKey.value.trim() || !selectedFile) return;
+    resetTerminals();
+    deployBtn.disabled = true;
+    setStatus('ESTABLISHING ENCRYPTED SOCKET...', 'live');
+    log('handshake initiated → /ws/analyze', 'socket');
+
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    socket = new WebSocket(`${proto}://${location.host}/ws/analyze`);
+    socket.binaryType = 'arraybuffer';
+
+    socket.addEventListener('open', async () => {
+      setStatus('TRANSMITTING BRIEF...', 'live');
+      socket.send(JSON.stringify({
+        api_key: apiKey.value.trim(),
+        filename: selectedFile.name,
+      }));
+      const buf = await selectedFile.arrayBuffer();
+      socket.send(buf);
+      startTimer();
+      setStatus('TRIBUNAL CONVENED // STREAMING', 'live');
+    });
+
+    socket.addEventListener('message', (ev) => {
+      let msg; try { msg = JSON.parse(ev.data); } catch { return; }
+      switch (msg.type) {
+        case 'status':
+          log(msg.message, 'status');
+          break;
+        case 'cache_hit':
+          cacheChip.classList.remove('hidden');
+          log(`cache hit → replaying verdict (original run ${msg.original_time}s)`, 'cache');
+          break;
+        case 'agent_start':
+          activateAgent(msg.agent, msg.name);
+          break;
+        case 'agent_token':
+          appendToken(msg.agent, msg.token);
+          break;
+        case 'agent_end':
+          finishAgent(msg.agent);
+          break;
+        case 'verdict': {
+          stopTimer();
+          const meta = msg.cached
+            ? `served from cache • original tribunal: ${msg.original_time}s`
+            : `tribunal completed in ${msg.execution_time}s`;
+          renderVerdict(msg.verdict, meta);
+          setStatus(msg.cached ? 'CACHE HIT // INSTANT' : 'TRIBUNAL SEALED', 'live');
+          log(`verdict rendered → <strong>${msg.verdict}</strong>`, 'judge');
+          deployBtn.disabled = false;
+          break;
+        }
+        case 'fatal':
+          stopTimer();
+          setStatus('TRIBUNAL ABORTED', 'err');
+          log(`fatal → ${msg.message}`, 'error');
+          deployBtn.disabled = false;
+          break;
+      }
+    });
+
+    socket.addEventListener('close', () => {
+      stopTimer();
+      Object.values(streams).forEach(el => el.classList.remove('cursor'));
+      deployBtn.disabled = false;
+    });
+    socket.addEventListener('error', () => {
+      setStatus('SOCKET ERROR', 'err');
+      log('websocket error', 'error');
+    });
+  });
+
+  updateDeployable();
+})();
+</script>
+</body>
+</html>
