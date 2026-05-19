@@ -37,7 +37,8 @@ def test_index_renders():
     r = client.get("/")
     assert r.status_code == 200
     body = r.text
-    for needle in ("Alex", "Sam", "Maya", "The Aegis", "Gemini API Key"):
+    for needle in ("Alex", "Sam", "Maya", "The Aegis", "API Key",
+                   "Google Gemini", "OpenAI"):
         assert needle in body
 
 
@@ -319,3 +320,99 @@ def test_build_graph_compiles():
     assert "critique" in node_set and "revise" in node_set
     for sid in agents_mod.SPECIALISTS:
         assert f"spec_{sid}" in node_set
+
+
+# ---------------------------------------------------------------------------
+# Multi-provider tests (Gemini + OpenAI)
+# ---------------------------------------------------------------------------
+
+from main import (  # noqa: E402
+    detect_provider, model_provider, OPENAI_MODELS, GEMINI_MODELS,
+    PROVIDER_FALLBACK, PROVIDER_MODELS,
+)
+
+
+def test_detect_provider_gemini_key():
+    assert detect_provider("AIzaSyABCDEFG123456") == "google"
+    assert detect_provider("AIzaXYZ") == "google"
+
+
+def test_detect_provider_openai_key():
+    assert detect_provider("sk-proj-XXXXXXXXXXX") == "openai"
+    assert detect_provider("sk-XXXXXXXX") == "openai"
+
+
+def test_detect_provider_anthropic_key():
+    assert detect_provider("sk-ant-api03-XXXX") == "anthropic"
+
+
+def test_detect_provider_unknown():
+    assert detect_provider("") is None
+    assert detect_provider("not-a-key") is None
+    assert detect_provider("gpt-4o-key") is None
+
+
+def test_model_provider_gemini():
+    assert model_provider("gemini-2.5-flash") == "google"
+    assert model_provider("gemini-2.5-pro") == "google"
+
+
+def test_model_provider_openai():
+    assert model_provider("gpt-4o") == "openai"
+    assert model_provider("gpt-5") == "openai"
+
+
+def test_model_provider_unknown():
+    assert model_provider("claude-3") is None
+
+
+def test_provider_fallback_map():
+    assert PROVIDER_FALLBACK["google"] in GEMINI_MODELS
+    assert PROVIDER_FALLBACK["openai"] in OPENAI_MODELS
+
+
+def test_provider_models_grouping():
+    assert set(PROVIDER_MODELS["google"]) == GEMINI_MODELS
+    assert set(PROVIDER_MODELS["openai"]) == OPENAI_MODELS
+
+
+def test_ws_rejects_unknown_key_format():
+    with client.websocket_connect("/ws/analyze") as ws:
+        ws.send_text(json.dumps({
+            "api_key": "not-a-real-key-format",
+            "filename": "x.pdf", "model": "gemini-2.5-flash",
+        }))
+        msg = json.loads(ws.receive_text())
+        assert msg["type"] == "fatal"
+        assert "provider" in msg["message"].lower() or "key" in msg["message"].lower()
+
+
+def test_ws_rejects_anthropic_key():
+    with client.websocket_connect("/ws/analyze") as ws:
+        ws.send_text(json.dumps({
+            "api_key": "sk-ant-api03-fake-key",
+            "filename": "x.pdf", "model": "gemini-2.5-flash",
+        }))
+        msg = json.loads(ws.receive_text())
+        assert msg["type"] == "fatal"
+        assert "anthropic" in msg["message"].lower()
+
+
+def test_ws_rejects_mismatched_key_and_model():
+    """Gemini key but OpenAI model — should fail with clear message."""
+    with client.websocket_connect("/ws/analyze") as ws:
+        ws.send_text(json.dumps({
+            "api_key": "AIzaSyFakeGeminiKey",
+            "filename": "x.pdf", "model": "gpt-4o",
+        }))
+        msg = json.loads(ws.receive_text())
+        assert msg["type"] == "fatal"
+        assert "provider" in msg["message"].lower()
+
+
+def test_health_reports_provider_models():
+    r = client.get("/health")
+    data = r.json()
+    assert "provider_models" in data
+    assert "google" in data["provider_models"]
+    assert "openai" in data["provider_models"]

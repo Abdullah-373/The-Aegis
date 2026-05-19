@@ -232,12 +232,13 @@
         <!-- API Key -->
         <div>
           <div class="flex items-center justify-between mb-2">
-            <label class="text-sm font-semibold text-ink-900">Gemini API Key</label>
-            <button type="button" id="toggleKey" class="text-xs font-medium text-ink-500 hover:text-indigo-600 transition">Show</button>
+            <label class="text-sm font-semibold text-ink-900">API Key</label>
+            <span class="text-[11px] text-ink-500"><span id="providerLabel">Gemini or OpenAI</span></span>
+            <button type="button" id="toggleKey" class="text-xs font-medium text-ink-500 hover:text-indigo-600 transition ml-2">Show</button>
           </div>
           <div class="relative">
             <input id="apiKey" type="password" autocomplete="off" spellcheck="false"
-              placeholder="AIza..."
+              placeholder="AIza... (Gemini) or sk-... (OpenAI)"
               class="ring-focus w-full bg-white border border-ink-200 rounded-xl px-4 py-2.5 text-sm font-mono pr-10" />
             <span id="keyDot" class="absolute right-3 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-ink-300 transition"></span>
           </div>
@@ -249,13 +250,20 @@
           <label class="text-sm font-semibold text-ink-900 mb-2 block">Model</label>
           <div class="relative">
             <select id="modelSelect" class="ring-focus w-full appearance-none bg-white border border-ink-200 rounded-xl px-4 py-2.5 text-sm pr-9">
-              {% for m in models %}
-                <option value="{{ m }}" {% if m == default_model %}selected{% endif %}>{{ m }}</option>
-              {% endfor %}
+              <optgroup label="Google Gemini">
+                {% for m in provider_models.google %}
+                  <option value="{{ m }}" data-provider="google" {% if m == default_model %}selected{% endif %}>{{ m }}{% if m == default_model %} (tested){% endif %}</option>
+                {% endfor %}
+              </optgroup>
+              <optgroup label="OpenAI{% if not openai_available %} — server missing langchain-openai{% endif %}">
+                {% for m in provider_models.openai %}
+                  <option value="{{ m }}" data-provider="openai">{{ m }}</option>
+                {% endfor %}
+              </optgroup>
             </select>
             <svg class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
           </div>
-          <p class="text-xs text-ink-500 mt-2">Flash is fast and cheap. Pro is slower but more thorough.</p>
+          <p class="text-xs text-ink-500 mt-2">Models are grouped by provider — the key prefix determines which one is used. Flash/Mini are fast and cheap. Pro/GPT-4o/GPT-5 are slower but more thorough.</p>
         </div>
 
         <!-- File -->
@@ -699,9 +707,53 @@
   }
 
   // ---------------- Setup view bindings ---------------------------------
+  function detectProvider(key) {
+    const k = (key || '').trim();
+    if (k.startsWith('AIza')) return 'google';
+    if (k.startsWith('sk-ant-')) return 'anthropic';
+    if (k.startsWith('sk-')) return 'openai';
+    return null;
+  }
   function updateStart() {
     els.startBtn.disabled = !(els.apiKey.value.trim() && state.file);
     els.keyDot.style.background = els.apiKey.value.trim() ? '#10b981' : '#cbd5e1';
+
+    // Provider hint + model/key compatibility check
+    const provider = detectProvider(els.apiKey.value);
+    const providerLabel = $('providerLabel');
+    if (providerLabel) {
+      if (!els.apiKey.value.trim()) {
+        providerLabel.textContent = 'Gemini or OpenAI';
+        providerLabel.className = 'text-ink-500';
+      } else if (provider === 'google') {
+        providerLabel.textContent = 'Google Gemini detected';
+        providerLabel.className = 'text-emerald-600 font-medium';
+      } else if (provider === 'openai') {
+        providerLabel.textContent = 'OpenAI detected';
+        providerLabel.className = 'text-emerald-600 font-medium';
+      } else if (provider === 'anthropic') {
+        providerLabel.textContent = 'Anthropic — not supported';
+        providerLabel.className = 'text-rose-600 font-medium';
+      } else {
+        providerLabel.textContent = 'unknown key format';
+        providerLabel.className = 'text-rose-600 font-medium';
+      }
+    }
+
+    // Auto-switch the model picker to the first model from the detected
+    // provider if the currently selected one belongs to a different one.
+    if (provider === 'google' || provider === 'openai') {
+      const cur = els.modelSelect.options[els.modelSelect.selectedIndex];
+      const curProv = cur && cur.dataset.provider;
+      if (curProv && curProv !== provider) {
+        for (const opt of els.modelSelect.options) {
+          if (opt.dataset.provider === provider) {
+            els.modelSelect.value = opt.value;
+            break;
+          }
+        }
+      }
+    }
   }
   els.apiKey.addEventListener('input', updateStart);
   els.toggleKey.addEventListener('click', () => {

@@ -78,26 +78,116 @@ MAX_PDF_CHARS = 100_000
 CHUNK_SIZE = 70_000
 CHUNK_OVERLAP = 1_500
 
-ALLOWED_MODELS = {
+# ---------------------------------------------------------------------------
+# Providers (Gemini + OpenAI)
+# ---------------------------------------------------------------------------
+
+# OpenAI support is optional. If langchain-openai is installed the user can
+# paste a key starting with "sk-" and the system routes to ChatOpenAI; if it
+# is missing, the system still works for Gemini and rejects OpenAI keys with
+# a clear error.
+try:
+    from langchain_openai import ChatOpenAI  # type: ignore
+    OPENAI_AVAILABLE = True
+except Exception:  # noqa: BLE001
+    OPENAI_AVAILABLE = False
+
+GEMINI_MODELS = {
     "gemini-2.0-flash",
     "gemini-2.0-flash-lite",
     "gemini-2.5-flash",
     "gemini-2.5-flash-lite",
     "gemini-2.5-pro",
 }
+OPENAI_MODELS = {
+    "gpt-4o",
+    "gpt-4o-mini",
+    "gpt-5",
+    "gpt-5-mini",
+}
+ALLOWED_MODELS = GEMINI_MODELS | OPENAI_MODELS
 DEFAULT_MODEL = "gemini-2.5-flash"
 
-# Model used to recover a structured ruling when the primary parse fails.
-FALLBACK_MODEL = "gemini-2.5-pro"
+# Per-provider fallback model used to recover a structured ruling when the
+# primary parse fails. Stronger / more reliable than the default for each.
+PROVIDER_FALLBACK = {
+    "google": "gemini-2.5-pro",
+    "openai": "gpt-4o",
+}
 
-# Real Gemini prices in USD per 1M tokens (input, output).
+# Per-provider grouping for the model picker — frontend renders these as
+# <optgroup> sections so the user can see at a glance which provider each
+# model belongs to.
+PROVIDER_MODELS = {
+    "google": sorted(GEMINI_MODELS),
+    "openai": sorted(OPENAI_MODELS),
+}
+
+# Real per-million-token prices in USD (input, output). OpenAI figures are
+# the published rates as of 2026; update the table if Google or OpenAI
+# changes them.
 MODEL_PRICES = {
+    # Gemini
     "gemini-2.0-flash":      (0.10,  0.40),
     "gemini-2.0-flash-lite": (0.075, 0.30),
     "gemini-2.5-flash":      (0.30,  2.50),
     "gemini-2.5-flash-lite": (0.10,  0.40),
     "gemini-2.5-pro":        (1.25, 10.00),
+    # OpenAI
+    "gpt-4o":                (2.50, 10.00),
+    "gpt-4o-mini":           (0.15,  0.60),
+    "gpt-5":                 (5.00, 20.00),
+    "gpt-5-mini":            (0.25,  1.00),
 }
+
+
+def detect_provider(api_key: str) -> str | None:
+    """Pick a provider from the key prefix. Returns None for unknown keys."""
+    key = (api_key or "").strip()
+    if key.startswith("AIza"):
+        return "google"
+    if key.startswith("sk-ant-"):
+        return "anthropic"  # detected but not supported
+    if key.startswith("sk-"):
+        return "openai"
+    return None
+
+
+def model_provider(model: str) -> str | None:
+    """Return the provider a model belongs to, or None if unknown."""
+    if model in GEMINI_MODELS:
+        return "google"
+    if model in OPENAI_MODELS:
+        return "openai"
+    return None
+
+
+def _make_llm(api_key: str, model: str, temperature: float = 0.2):
+    """Construct the right LangChain chat model for the given API key.
+
+    Falls back to a Pydantic / LangChain default temperature semantics —
+    same parameter name, different normalisation across providers.
+    """
+    provider = detect_provider(api_key)
+    if provider == "google":
+        return ChatGoogleGenerativeAI(
+            google_api_key=api_key, model=model, temperature=temperature,
+        )
+    if provider == "openai":
+        if not OPENAI_AVAILABLE:
+            raise RuntimeError(
+                "OpenAI support requires the langchain-openai package. "
+                "Install it with: pip install langchain-openai"
+            )
+        # ChatOpenAI uses `api_key` rather than the provider-named arg.
+        return ChatOpenAI(
+            api_key=api_key, model=model, temperature=temperature,
+        )
+    raise RuntimeError(
+        f"Could not detect provider from API key (key starts with "
+        f"'{api_key[:4]}...'). Supported prefixes: AIza... (Gemini), "
+        f"sk-... (OpenAI)."
+    )
 
 HELPERS = {
     "alex": {"name": "Alex", "role": "Strategist", "tag": "finds the upside"},
@@ -546,11 +636,14 @@ async def _try_extract_json(
 async def _structured_fallback(
     api_key: str, original_model: str, maya_text: str
 ) -> FinalAnswer | None:
-    """Two-stage recovery: same model at temp=0, then escalate to pro."""
+    """Two-stage recovery: same model at temp=0, then escalate to the
+    stronger model from the same provider (Gemini → 2.5-pro, OpenAI →
+    gpt-4o)."""
+    provider = model_provider(original_model)
+    fallback_model = PROVIDER_FALLBACK.get(provider or "google", "gemini-2.5-pro")
+
     try:
-        llm_strict = ChatGoogleGenerativeAI(
-            google_api_key=api_key, model=original_model, temperature=0.0,
-        )
+        llm_strict = _make_llm(api_key, original_model, temperature=0.0)
         result = await _try_extract_json(llm_strict, maya_text)
         if result:
             log.info("structured fallback recovered (same model, temp=0)")
@@ -558,15 +651,13 @@ async def _structured_fallback(
     except Exception as exc:  # noqa: BLE001
         log.warning("structured fallback level 1 init failed: %s", exc)
 
-    if original_model != FALLBACK_MODEL:
+    if original_model != fallback_model:
         try:
-            log.info("escalating structured fallback to %s", FALLBACK_MODEL)
-            llm_pro = ChatGoogleGenerativeAI(
-                google_api_key=api_key, model=FALLBACK_MODEL, temperature=0.0,
-            )
+            log.info("escalating structured fallback to %s", fallback_model)
+            llm_pro = _make_llm(api_key, fallback_model, temperature=0.0)
             result = await _try_extract_json(llm_pro, maya_text)
             if result:
-                log.info("structured fallback recovered via %s", FALLBACK_MODEL)
+                log.info("structured fallback recovered via %s", fallback_model)
                 return result
         except Exception as exc:  # noqa: BLE001
             log.warning("structured fallback level 2 failed: %s", exc)
@@ -679,6 +770,8 @@ async def index(request: Request) -> HTMLResponse:
             "default_model": DEFAULT_MODEL,
             "helpers": HELPERS,
             "ocr_available": OCR_AVAILABLE,
+            "provider_models": PROVIDER_MODELS,
+            "openai_available": OPENAI_AVAILABLE,
         },
     )
 
@@ -689,7 +782,9 @@ async def health() -> dict[str, Any]:
         "status": "ok",
         "service": "The Aegis",
         "ocr": OCR_AVAILABLE,
+        "openai_provider": OPENAI_AVAILABLE,
         "models": sorted(ALLOWED_MODELS),
+        "provider_models": PROVIDER_MODELS,
     }
 
 
@@ -813,14 +908,47 @@ async def _run_pipeline(ws: WebSocket) -> None:
 
     if not api_key:
         await _send(ws, {"type": "fatal",
-                         "message": "Please add your Gemini API key first."})
+                         "message": "Please paste a Gemini or OpenAI API key first."})
         return
     if model not in ALLOWED_MODELS:
         await _send(ws, {"type": "fatal",
                          "message": f"This model is not allowed: {model}"})
         return
 
-    log.info("new pipeline: model=%s filename=%s force=%s", model, filename, force)
+    # Validate that the key matches the selected model's provider. Anthropic
+    # keys are detected but explicitly rejected since the agent layer is not
+    # wired up for Anthropic in this build.
+    key_provider = detect_provider(api_key)
+    model_prov = model_provider(model)
+    if key_provider is None:
+        await _send(ws, {"type": "fatal",
+                         "message": ("Could not detect a provider from this "
+                                     "key. Gemini keys start with 'AIza...', "
+                                     "OpenAI keys start with 'sk-...'.")})
+        return
+    if key_provider == "anthropic":
+        await _send(ws, {"type": "fatal",
+                         "message": ("Anthropic keys are not supported in "
+                                     "this build. Please use a Gemini or "
+                                     "OpenAI key.")})
+        return
+    if key_provider == "openai" and not OPENAI_AVAILABLE:
+        await _send(ws, {"type": "fatal",
+                         "message": ("OpenAI support is not installed on the "
+                                     "server. Run `pip install "
+                                     "langchain-openai` and restart.")})
+        return
+    if key_provider != model_prov:
+        await _send(ws, {"type": "fatal",
+                         "message": (f"The '{model}' model belongs to the "
+                                     f"{model_prov} provider, but the key "
+                                     f"you pasted is a {key_provider} key. "
+                                     f"Pick a model from the matching "
+                                     f"provider group.")})
+        return
+
+    log.info("new pipeline: provider=%s model=%s filename=%s force=%s",
+             key_provider, model, filename, force)
 
     # ---- 2) Read PDF ---------------------------------------------------
     await _send(ws, {"type": "status", "message": "Waiting for your file..."})
@@ -879,13 +1007,11 @@ async def _run_pipeline(ws: WebSocket) -> None:
 
     # ---- 4) Initialise LLM ---------------------------------------------
     try:
-        llm = ChatGoogleGenerativeAI(
-            google_api_key=api_key, model=model, temperature=0.2,
-        )
+        llm = _make_llm(api_key, model, temperature=0.2)
     except Exception as exc:  # noqa: BLE001
-        log.exception("Gemini init failed")
+        log.exception("LLM init failed")
         await _send(ws, {"type": "fatal",
-                         "message": f"Could not start Gemini: {exc}"})
+                         "message": f"Could not start the model: {exc}"})
         return
 
     start = time.perf_counter()
