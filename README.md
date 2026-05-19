@@ -2,9 +2,17 @@
 
 **A multi-agent AI system for contract risk analysis.**
 
-Upload a PDF. A planner agent picks which specialist analysts to run, the specialists do their analysis with access to a precedent search tool, a Strategist agent argues the bullish case, a Red Team agent attacks it, and a Judge agent renders a structured verdict with a 0–100 risk score and a list of conditions to fix. The whole deliberation streams live to the browser. Same PDF the second time? It comes back from the SQLite cache in under two seconds at zero API cost.
+Upload a PDF. A planner agent picks which specialist analysts to run, the specialists do their analysis with access to a precedent search tool, a Strategist agent argues the bullish case, a Red Team agent attacks it, and a Judge agent renders a structured verdict with a 0–100 risk score and a list of conditions to fix. The whole deliberation streams live to the browser. Same PDF the second time? It comes back from the SQLite cache at zero API cost.
 
-![Verdict dashboard](docs/screenshot.png)
+![Verdict dashboard — NO-GO ruling on the sample contract](docs/screenshot.png)
+
+The three agents are observable in real time. Alex argues the bullish case, Sam quotes Alex and dismantles each point, Maya reads both and rules:
+
+![Tribunal transcripts — Alex, Sam, and Maya side by side](docs/screenshot_transcripts.png)
+
+The pipeline is not strictly deterministic, so running the same PDF a second time can produce a softer verdict that surfaces the same risks but recommends fixing them rather than walking away:
+
+![Run B on the same PDF — CONDITIONAL-GO (MAYBE) with eight conditions](docs/screenshot_maybe88.png)
 
 ---
 
