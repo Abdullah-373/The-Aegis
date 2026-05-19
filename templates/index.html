@@ -293,11 +293,37 @@
           </label>
         </div>
 
+        <!-- Mode -->
+        <div class="border-t border-ink-100 pt-5">
+          <label class="text-sm font-semibold text-ink-900 mb-2 block">Pipeline mode</label>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="cursor-pointer">
+              <input type="radio" name="mode" value="fast" checked class="peer sr-only"/>
+              <div class="rounded-xl border border-ink-200 p-3 text-center transition peer-checked:border-indigo-500 peer-checked:bg-indigo-50">
+                <div class="text-sm font-semibold text-ink-900">Fast</div>
+                <div class="text-[11px] text-ink-500 mt-0.5">3 API calls · free-tier friendly</div>
+              </div>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="mode" value="full" class="peer sr-only"/>
+              <div class="rounded-xl border border-ink-200 p-3 text-center transition peer-checked:border-indigo-500 peer-checked:bg-indigo-50">
+                <div class="text-sm font-semibold text-ink-900">Full multi-agent</div>
+                <div class="text-[11px] text-ink-500 mt-0.5">Planner + RAG + critique · 8-15 calls</div>
+              </div>
+            </label>
+          </div>
+          <p class="text-xs text-ink-500 mt-2">
+            The Gemini free tier is 20 requests per day on flash. Fast lets you
+            run ~6 analyses; Full uses the multi-agent pipeline but you may
+            hit the daily cap after 1-2 runs.
+          </p>
+        </div>
+
         <!-- Force re-run -->
         <div class="flex items-center justify-between border-t border-ink-100 pt-5">
           <div>
             <div class="text-sm font-medium text-ink-900">Force re-analyze</div>
-            <div class="text-xs text-ink-500 mt-0.5">Skip the cache and re-run all three agents.</div>
+            <div class="text-xs text-ink-500 mt-0.5">Skip the cache and re-run from scratch.</div>
           </div>
           <label class="toggle">
             <input id="forceToggle" type="checkbox"/>
@@ -1028,6 +1054,7 @@
         filename: state.file.name,
         model: els.modelSelect.value,
         force: els.forceToggle.checked,
+        mode: (document.querySelector('input[name="mode"]:checked') || {}).value || 'fast',
       }));
       const buf = await state.file.arrayBuffer();
       state.socket.send(buf);

@@ -271,7 +271,34 @@ def _is_transient(exc_str: str) -> bool:
             "unavailable", "timeout", "temporarily",
             "connection reset", "deadline exceeded",
             "internal error", "overloaded",
+            "resource_exhausted",
         )
+    )
+
+
+_RETRY_DELAY_RE = re.compile(
+    r"retry[Dd]elay['\"]?\s*[:=]\s*['\"]?(\d+(?:\.\d+)?)\s*s?", re.IGNORECASE,
+)
+
+
+def _suggested_retry_delay(exc_str: str) -> float | None:
+    """Parse Google's `retryDelay` hint out of a 429 error body."""
+    m = _RETRY_DELAY_RE.search(exc_str)
+    if m:
+        try:
+            return float(m.group(1))
+        except ValueError:
+            return None
+    return None
+
+
+def _is_quota_exhausted(exc_str: str) -> bool:
+    """Detect free-tier daily-cap exhaustion (a non-retryable 429 variant)."""
+    msg = exc_str.lower()
+    return (
+        "free_tier" in msg or "free-tier" in msg
+        or "per day" in msg or "perdaypper" in msg
+        or "generaterequestsperday" in msg
     )
 
 
@@ -341,15 +368,43 @@ async def _stream_helper(
         except Exception as exc:  # noqa: BLE001
             last_exc_msg = str(exc)
             transient = _is_transient(last_exc_msg)
+            # If the free-tier daily cap is the cause there is no point
+            # retrying — the next call will fail with the same error until
+            # the cap resets. Surface a clear message instead.
+            if _is_quota_exhausted(last_exc_msg):
+                log.warning("%s hit the free-tier daily cap", helper_id)
+                msg = (
+                    "Gemini free-tier daily quota reached. The current "
+                    "tribunal run was incomplete. Switch the model picker "
+                    "to a different model, wait for the daily reset, or "
+                    "use Fast mode (3 API calls per run) instead of Full "
+                    "multi-agent mode (8-15 calls)."
+                )
+                try:
+                    await _send(ws, {"type": "helper_token", "helper": helper_id,
+                                     "token": f"\n\n[QUOTA EXHAUSTED: {msg}]"})
+                except Exception:  # noqa: BLE001
+                    pass
+                full += f"\n\n[QUOTA EXHAUSTED]"
+                break
             if first_token and transient and attempt < max_attempts:
-                delay = 1.0 * (2 ** (attempt - 1))
+                suggested = _suggested_retry_delay(last_exc_msg)
+                # Cap the suggested delay to a sensible upper bound so a
+                # buggy server hint cannot wedge the pipeline indefinitely.
+                if suggested is not None:
+                    delay = min(suggested + 0.5, 30.0)
+                else:
+                    delay = 1.0 * (2 ** (attempt - 1))
                 log.warning(
-                    "%s attempt %d/%d transient: %s — retrying in %.1fs",
-                    helper_id, attempt, max_attempts, last_exc_msg, delay,
+                    "%s attempt %d/%d transient (delay=%.1fs%s): %s",
+                    helper_id, attempt, max_attempts, delay,
+                    " from server" if suggested is not None else "",
+                    last_exc_msg[:160],
                 )
                 await _send(ws, {
                     "type": "status",
-                    "message": f"Transient error in {helper_id} — retrying...",
+                    "message": (f"Transient error in {helper_id} — "
+                                f"retrying in {delay:.1f}s..."),
                 })
                 await asyncio.sleep(delay)
                 continue
@@ -728,6 +783,9 @@ async def _run_pipeline(ws: WebSocket) -> None:
     filename = (meta.get("filename") or "document.pdf").strip()
     model = (meta.get("model") or DEFAULT_MODEL).strip()
     force = bool(meta.get("force"))
+    mode = (meta.get("mode") or "fast").strip().lower()
+    if mode not in ("fast", "full"):
+        mode = "fast"
 
     if not api_key:
         await _send(ws, {"type": "fatal",
@@ -798,7 +856,7 @@ async def _run_pipeline(ws: WebSocket) -> None:
     # ---- 4) Initialise LLM ---------------------------------------------
     try:
         llm = ChatGoogleGenerativeAI(
-            google_api_key=api_key, model=model, temperature=0.4,
+            google_api_key=api_key, model=model, temperature=0.2,
         )
     except Exception as exc:  # noqa: BLE001
         log.exception("Gemini init failed")
@@ -828,40 +886,92 @@ async def _run_pipeline(ws: WebSocket) -> None:
         await _send(ws, {"type": "status",
                          "message": "Convening the tribunal. 3 agents deploying..."})
 
-    # ---- 6) Run the multi-agent graph -----------------------------------
-    # The pipeline is: Planner → Specialists (selected subset, with tool use
-    # over the knowledge base) → Alex (Strategist) → Sam (Red Team, also
-    # tool-using) → Maya (Judge) → Critique (Alex+Sam in parallel) → if any
-    # dissent, Maya revises. All streamed live to the WebSocket.
-    from agents import build_graph
+    # ---- 6) Run the chosen pipeline ------------------------------------
+    # Two modes:
+    #   "fast" — three sequential LLM calls (Alex → Sam → Maya). 3 API
+    #             requests per analysis, free-tier friendly (the Gemini
+    #             free tier is 20 requests/day). Default.
+    #   "full" — LangGraph multi-agent system: Planner → Specialists with
+    #             tool use over the knowledge base → Alex → Sam (also
+    #             tool-using) → Maya → Critique (Alex+Sam parallel) →
+    #             optional Maya revision. 8-15+ API requests per run.
+    await _send(ws, {"type": "mode", "mode": mode})
 
-    async def _emit(payload: dict[str, Any]) -> None:
-        await _send(ws, payload)
+    specialists_used: list[str] = []
+    specialist_reports: dict[str, str] = {}
+    critique_dissent = False
+    revision_output = ""
+    pre_validated_ruling: dict[str, Any] | None = None
 
-    graph = build_graph(llm, _emit)
-    try:
-        final_state = await graph.ainvoke({"document": analysis_text})
-    except (WebSocketDisconnect, asyncio.CancelledError):
-        raise
-    except Exception as exc:  # noqa: BLE001
-        log.exception("graph execution failed: %s", exc)
-        await _send(ws, {"type": "fatal",
-                         "message": f"Tribunal pipeline failed: {exc}"})
-        return
+    if mode == "full":
+        from agents import build_graph
 
-    alex_out = final_state.get("alex_output", "")
-    sam_out = final_state.get("sam_output", "")
-    maya_out = final_state.get("final_maya") or final_state.get("maya_output", "")
-    specialists_used = final_state.get("selected_specialists", [])
-    specialist_reports = final_state.get("specialist_reports", {})
-    critique_dissent = bool(final_state.get("needs_revision", False))
-    revision_output = final_state.get("revision_output", "")
-    pre_validated_ruling = final_state.get("final_ruling")
+        async def _emit(payload: dict[str, Any]) -> None:
+            await _send(ws, payload)
+
+        graph = build_graph(llm, _emit)
+        try:
+            final_state = await graph.ainvoke({"document": analysis_text})
+        except (WebSocketDisconnect, asyncio.CancelledError):
+            raise
+        except Exception as exc:  # noqa: BLE001
+            log.exception("graph execution failed: %s", exc)
+            await _send(ws, {
+                "type": "fatal",
+                "message": f"Tribunal pipeline failed: {exc}",
+            })
+            return
+
+        alex_out = final_state.get("alex_output", "")
+        sam_out = final_state.get("sam_output", "")
+        maya_out = final_state.get("final_maya") or final_state.get("maya_output", "")
+        specialists_used = final_state.get("selected_specialists", [])
+        specialist_reports = final_state.get("specialist_reports", {})
+        critique_dissent = bool(final_state.get("needs_revision", False))
+        revision_output = final_state.get("revision_output", "")
+        pre_validated_ruling = final_state.get("final_ruling")
+    else:
+        # Fast mode: classic 3-call pipeline. Identical to the original
+        # design before the multi-agent refactor.
+        alex_prompt = (
+            "DOCUMENT UNDER REVIEW:\n\n"
+            f"```\n{analysis_text}\n```\n\n"
+            "Write your strategic business benefits breakdown now."
+        )
+        alex_out = await _stream_helper(
+            ws, llm, "alex", "Alex (Strategist)",
+            ALEX_SYSTEM, alex_prompt,
+        )
+        sam_prompt = (
+            "DOCUMENT UNDER REVIEW:\n\n"
+            f"```\n{analysis_text}\n```\n\n"
+            "STRATEGIST'S BULLISH ANALYSIS (attack these points):\n\n"
+            f"```\n{alex_out}\n```\n\n"
+            "Execute the adversarial Red Team attack now."
+        )
+        sam_out = await _stream_helper(
+            ws, llm, "sam", "Sam (Red Team)",
+            SAM_SYSTEM, sam_prompt,
+        )
+        maya_prompt = (
+            "DOCUMENT EXCERPT:\n\n"
+            f"```\n{analysis_text[:6000]}\n```\n\n"
+            "STRATEGIST POSITION:\n\n"
+            f"```\n{alex_out}\n```\n\n"
+            "RED TEAM REBUTTAL:\n\n"
+            f"```\n{sam_out}\n```\n\n"
+            "Render your tribunal ruling now. Rationale first, then exactly one "
+            "fenced JSON block at the very end."
+        )
+        maya_out = await _stream_helper(
+            ws, llm, "maya", "Maya (Judge)",
+            MAYA_SYSTEM, maya_prompt,
+        )
 
     elapsed = round(time.perf_counter() - start, 2)
     log.info(
-        "tribunal complete in %.2fs (chunked=%s, specialists=%s, dissent=%s)",
-        elapsed, chunked, specialists_used, critique_dissent,
+        "pipeline complete in %.2fs (mode=%s, chunked=%s, specialists=%s, dissent=%s)",
+        elapsed, mode, chunked, specialists_used, critique_dissent,
     )
 
     # ---- 7) Parse structured ruling ------------------------------------
