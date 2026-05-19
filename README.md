@@ -52,16 +52,32 @@ When a specialist calls the tool, the top-4 matches come back as a JSON list wit
 
 ## Measured performance
 
-Tested end-to-end against the live Gemini API with the bundled `samples/sample_contract.pdf` in Full mode:
+Tested end-to-end against the live Gemini API with the bundled `samples/sample_contract.pdf`.
+
+**Cache experiment (Fast mode, clean measurement):**
 
 | Metric              | First run         | Cached replay     | Change            |
 |---------------------|-------------------|-------------------|-------------------|
-| Wall-clock time     | 132.38 s          | 1.68 s            | **98.7% faster** |
-| Tokens used         | ~4,337            | 0                 | 100% saved        |
-| API cost (list)     | $0.0057           | $0.0000           | 100% saved        |
-| Verdict             | NO-GO             | NO-GO             | Bit-identical     |
+| Wall-clock time     | 30.65 s           | 1.68 s            | **94.5% faster**  |
+| Tokens used         | 3,768             | 0                 | 100% saved        |
+| API cost (list)     | $0.0051           | $0.0000           | 100% saved        |
+| Verdict             | CONDITIONAL-GO    | CONDITIONAL-GO    | Bit-identical     |
+| Risk score          | 85                | 85                | Bit-identical     |
 
-The cost figures are list-price equivalents at Gemini's published per-token rates. Every test ran on the free tier so the actual out-of-pocket cost was $0.00 for both runs.
+**Full multi-agent mode (first run on same PDF):**
+
+| Metric              | Value                                       |
+|---------------------|---------------------------------------------|
+| Wall-clock time     | **132.38 s**                                |
+| Tokens used         | **4,337**                                   |
+| API cost (list)     | **$0.0057**                                 |
+| Verdict             | **NO-GO**                                   |
+| Risk score          | **95** (high risk band)                     |
+| Risks flagged       | 5 (data licence, prepayment+termination, liability cap, weak SLA, no data export) |
+
+The Full pipeline produces a stronger verdict (NO-GO 95 vs CONDITIONAL-GO 85) because the specialists surface specific clauses that Alex and Sam in Fast mode can only see through their general lens. I did not get a clean cache-hit measurement for Full mode because of free-tier rate limits — the cache mechanism is the same in both modes (no API call on a hit), so the cost saving is identical; only the wall-clock replay number is unverified for Full.
+
+The cost figures are list-price equivalents at Gemini's published per-token rates. Every test ran on the free tier so the actual out-of-pocket cost was $0.00.
 
 ## Quick start
 
