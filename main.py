@@ -22,7 +22,16 @@ import json
 import logging
 import re
 import time
+import warnings
 from typing import Any, Literal
+
+# Silence the LangChain → Pydantic V1 shim warning on Python 3.14. The shim
+# functionality we don't use is broken under 3.14; the bits we do use work
+# fine. Suppressing the warning keeps the startup log readable.
+warnings.filterwarnings(
+    "ignore",
+    message=".*Pydantic V1.*",
+)
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -53,13 +62,11 @@ try:
     import pytesseract  # type: ignore
     from pdf2image import convert_from_bytes  # type: ignore
     OCR_AVAILABLE = True
-    log.info("OCR available (pytesseract + pdf2image installed)")
 except Exception:  # noqa: BLE001
     OCR_AVAILABLE = False
-    log.info(
-        "OCR not available — install pytesseract, pdf2image and the tesseract "
-        "binary to enable scanned-PDF support"
-    )
+# The OCR availability log line is emitted once from the FastAPI startup
+# event (see _log_startup below) rather than at module-import time, so it
+# does not print twice when uvicorn re-imports the module.
 
 # ---------------------------------------------------------------------------
 # Config
@@ -102,6 +109,23 @@ app = FastAPI(title="The Aegis", description="Three AI agents review your PDF")
 templates = Jinja2Templates(directory="templates")
 
 init_db()
+
+
+@app.on_event("startup")
+async def _log_startup() -> None:
+    """Single OCR-status log line at server boot.
+
+    Logging this from a startup event rather than at module import time
+    avoids the duplicate-message issue when uvicorn imports `main` twice
+    (once as the entry-point script, once again to resolve `main:app`).
+    """
+    if OCR_AVAILABLE:
+        log.info("OCR available (pytesseract + pdf2image installed)")
+    else:
+        log.info(
+            "OCR not available — install pytesseract, pdf2image and the "
+            "tesseract binary to enable scanned-PDF support"
+        )
 
 
 # ---------------------------------------------------------------------------
