@@ -618,22 +618,29 @@ async def _node_finalise(state: TribunalState) -> TribunalState:
 
 def build_graph(llm: ChatGoogleGenerativeAI, emit: EmitFn):
     """Build a compiled LangGraph that runs the full tribunal pipeline."""
+
+    # LangGraph inspects the node callable to decide whether to await it.
+    # A sync lambda that *returns* a coroutine is NOT recognised as a
+    # coroutine function — langgraph passes the coroutine downstream
+    # unawaited and the StateGraph reducer then complains it got a
+    # coroutine instead of a dict. Every node has to be wrapped in a
+    # real `async def` closure so the runtime introspection works.
+    def _bind(node_fn):
+        async def _wrapped(state):
+            return await node_fn(state, llm, emit)
+        _wrapped.__name__ = f"bound_{getattr(node_fn, '__name__', 'node')}"
+        return _wrapped
+
     g = StateGraph(TribunalState)
 
-    g.add_node("planner", lambda s: _node_planner(s, llm, emit))
+    g.add_node("planner", _bind(_node_planner))
     for sid in SPECIALISTS:
-        spec_node = _make_specialist_node(sid)
-        # Capture the per-iteration coroutine factory in a default-arg
-        # closure so each specialist node points at the right one.
-        g.add_node(
-            f"spec_{sid}",
-            (lambda fn=spec_node: (lambda s: fn(s, llm, emit)))(),
-        )
-    g.add_node("alex", lambda s: _node_alex(s, llm, emit))
-    g.add_node("sam", lambda s: _node_sam(s, llm, emit))
-    g.add_node("maya", lambda s: _node_maya(s, llm, emit))
-    g.add_node("critique", lambda s: _node_critique(s, llm, emit))
-    g.add_node("revise", lambda s: _node_revise(s, llm, emit))
+        g.add_node(f"spec_{sid}", _bind(_make_specialist_node(sid)))
+    g.add_node("alex", _bind(_node_alex))
+    g.add_node("sam", _bind(_node_sam))
+    g.add_node("maya", _bind(_node_maya))
+    g.add_node("critique", _bind(_node_critique))
+    g.add_node("revise", _bind(_node_revise))
     g.add_node("finalise", _node_finalise)
 
     g.set_entry_point("planner")
