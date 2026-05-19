@@ -1048,14 +1048,33 @@
           if (msg.truncated) els.truncBadge.classList.remove('hidden');
           log(`cache hit · original run ${msg.original_time}s · ${msg.model}`, 'cache');
           break;
+        case 'planner_decision':
+          log(`planner picked: ${(msg.selected || []).join(', ')}`, 'planner');
+          break;
+        case 'critique_outcome':
+          log(msg.needs_revision
+              ? 'critique dissent — Maya will revise'
+              : 'critique accepted — ruling stands', 'critique');
+          break;
         case 'helper_start':
-          activateHelper(msg.helper);
+          if (els.cards[msg.helper]) {
+            activateHelper(msg.helper);
+          } else {
+            // Sub-agent (planner / specialist / critique / maya_revised):
+            // surface activity in the footer log so the user can see the
+            // pipeline running without cluttering the three main cards.
+            log(`${msg.name || msg.helper} → working`, 'agent');
+          }
           break;
         case 'helper_token':
-          appendToken(msg.helper, msg.token);
+          if (els.cards[msg.helper]) appendToken(msg.helper, msg.token);
           break;
         case 'helper_end':
-          finishHelper(msg.helper, msg);
+          if (els.cards[msg.helper]) {
+            finishHelper(msg.helper, msg);
+          } else {
+            log(`${msg.helper} → done · ${(msg.est_tokens||0).toLocaleString()} tokens`, 'agent');
+          }
           break;
         case 'verdict':
           stopTimer();

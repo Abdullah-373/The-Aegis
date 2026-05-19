@@ -224,3 +224,98 @@ def test_get_verdict_returns_full_record_when_seeded():
     assert data["transcripts"]["alex"] == "alex text"
     assert data["transcripts"]["maya"] == "maya text"
     assert data["structured"]["verdict"] == "GO"
+
+
+# ---------------------------------------------------------------------------
+# Multi-agent additions: knowledge base, tools, graph
+# ---------------------------------------------------------------------------
+
+from knowledge_base import KNOWLEDGE_BASE, search as kb_search, categories  # noqa: E402
+from tools import ALL_TOOLS, tool_call_summary  # noqa: E402
+import agents as agents_mod  # noqa: E402
+
+
+def test_knowledge_base_loaded():
+    assert len(KNOWLEDGE_BASE) >= 30
+    cats = categories()
+    for required in ("liability", "indemnification", "data", "sla"):
+        assert required in cats
+
+
+def test_kb_search_returns_relevant_for_liability_query():
+    hits = kb_search("liability cap 3 months fees")
+    assert hits, "expected at least one hit"
+    ids = [p.id for p in hits]
+    assert "liability_cap_short" in ids
+
+
+def test_kb_search_returns_relevant_for_data_query():
+    hits = kb_search("perpetual licence anonymised customer data ML training")
+    assert hits
+    ids = [p.id for p in hits]
+    assert "perpetual_data_license" in ids
+
+
+def test_kb_search_empty_query():
+    assert kb_search("") == []
+
+
+def test_kb_search_unmatched_query():
+    # A query with no overlap with any KB entry should return empty.
+    hits = kb_search("xyzzy plover frobnicate")
+    assert hits == []
+
+
+def test_tools_registered():
+    names = [t.name for t in ALL_TOOLS]
+    assert "search_precedent" in names
+
+
+def test_search_precedent_tool_returns_json():
+    tool = next(t for t in ALL_TOOLS if t.name == "search_precedent")
+    result = tool.invoke({"query": "liability cap"})
+    data = json.loads(result)
+    assert "matches" in data
+    assert len(data["matches"]) >= 1
+    assert "title" in data["matches"][0]
+
+
+def test_tool_call_summary_renders_search_call():
+    s = tool_call_summary({"name": "search_precedent", "args": {"query": "data licence"}})
+    assert "search_precedent" in s
+    assert "data licence" in s
+
+
+def test_specialists_have_required_fields():
+    for sid, spec in agents_mod.SPECIALISTS.items():
+        assert "name" in spec and "focus" in spec
+        assert len(spec["focus"]) > 50  # not a stub
+
+
+def test_extract_json_helper_finds_last_block():
+    text = (
+        "## REASON\nsomething\n"
+        "```json\n{\"verdict\": \"GO\"}\n```\n"
+        "more text\n"
+        "```json\n{\"verdict\": \"NO-GO\", \"risk_score\": 90}\n```"
+    )
+    out = agents_mod._extract_json(text)
+    assert out is not None and out["verdict"] == "NO-GO"
+
+
+def test_build_graph_compiles():
+    # Build with a dummy LLM stand-in. We never call ainvoke here, just
+    # confirm the graph topology compiles without raising.
+    class _DummyLLM:
+        def bind_tools(self, _tools):
+            return self
+    async def _noop(_payload):
+        pass
+    graph = agents_mod.build_graph(_DummyLLM(), _noop)
+    # The compiled graph exposes nodes via its underlying definition.
+    node_set = set(graph.get_graph().nodes)
+    assert "planner" in node_set
+    assert "alex" in node_set and "sam" in node_set and "maya" in node_set
+    assert "critique" in node_set and "revise" in node_set
+    for sid in agents_mod.SPECIALISTS:
+        assert f"spec_{sid}" in node_set

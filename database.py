@@ -3,6 +3,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     Boolean, Column, DateTime, Float, Integer, String, Text, create_engine, event,
+    text as sql_text,
 )
 from sqlalchemy.orm import declarative_base, sessionmaker
 
@@ -45,11 +46,33 @@ class VerdictCache(Base):
     truncated = Column(Boolean, nullable=False, default=False)
     chunked = Column(Boolean, nullable=False, default=False)
     pdf_chars = Column(Integer, nullable=False, default=0)
+    # Multi-agent fields (added when the LangGraph pipeline was introduced).
+    specialists_json = Column(Text, nullable=False, default="[]")
+    specialist_reports_json = Column(Text, nullable=False, default="{}")
+    critique_dissent = Column(Boolean, nullable=False, default=False)
+    revision_output = Column(Text, nullable=False, default="")
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
 
 def init_db() -> None:
     Base.metadata.create_all(bind=engine)
+    # Idempotent migrations for existing databases that pre-date the
+    # multi-agent fields. SQLite silently errors if a column exists; we
+    # catch and continue so a fresh install and an upgraded install both
+    # end up with the right schema.
+    migrations = (
+        "ALTER TABLE verdict_cache ADD COLUMN specialists_json TEXT NOT NULL DEFAULT '[]'",
+        "ALTER TABLE verdict_cache ADD COLUMN specialist_reports_json TEXT NOT NULL DEFAULT '{}'",
+        "ALTER TABLE verdict_cache ADD COLUMN critique_dissent BOOLEAN NOT NULL DEFAULT 0",
+        "ALTER TABLE verdict_cache ADD COLUMN revision_output TEXT NOT NULL DEFAULT ''",
+    )
+    with engine.connect() as conn:
+        for ddl in migrations:
+            try:
+                conn.execute(sql_text(ddl))
+                conn.commit()
+            except Exception:  # noqa: BLE001
+                conn.rollback()
 
 
 def get_session():

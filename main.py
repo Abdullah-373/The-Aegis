@@ -828,61 +828,62 @@ async def _run_pipeline(ws: WebSocket) -> None:
         await _send(ws, {"type": "status",
                          "message": "Convening the tribunal. 3 agents deploying..."})
 
-    # ---- 6) Alex --------------------------------------------------------
-    alex_prompt = (
-        "DOCUMENT UNDER REVIEW:\n\n"
-        f"```\n{analysis_text}\n```\n\n"
-        "Write your strategic business benefits breakdown now."
-    )
-    alex_out = await _stream_helper(
-        ws, llm, "alex", "Alex (Strategist)",
-        ALEX_SYSTEM, alex_prompt,
-    )
+    # ---- 6) Run the multi-agent graph -----------------------------------
+    # The pipeline is: Planner → Specialists (selected subset, with tool use
+    # over the knowledge base) → Alex (Strategist) → Sam (Red Team, also
+    # tool-using) → Maya (Judge) → Critique (Alex+Sam in parallel) → if any
+    # dissent, Maya revises. All streamed live to the WebSocket.
+    from agents import build_graph
 
-    # ---- 7) Sam ---------------------------------------------------------
-    sam_prompt = (
-        "DOCUMENT UNDER REVIEW:\n\n"
-        f"```\n{analysis_text}\n```\n\n"
-        "STRATEGIST'S BULLISH ANALYSIS (attack these points):\n\n"
-        f"```\n{alex_out}\n```\n\n"
-        "Execute the adversarial Red Team attack now."
-    )
-    sam_out = await _stream_helper(
-        ws, llm, "sam", "Sam (Red Team)",
-        SAM_SYSTEM, sam_prompt,
-    )
+    async def _emit(payload: dict[str, Any]) -> None:
+        await _send(ws, payload)
 
-    # ---- 8) Maya --------------------------------------------------------
-    maya_prompt = (
-        "DOCUMENT EXCERPT:\n\n"
-        f"```\n{analysis_text[:6000]}\n```\n\n"
-        "STRATEGIST POSITION:\n\n"
-        f"```\n{alex_out}\n```\n\n"
-        "RED TEAM REBUTTAL:\n\n"
-        f"```\n{sam_out}\n```\n\n"
-        "Render your tribunal ruling now. Rationale first, then exactly one "
-        "fenced JSON block at the very end."
-    )
-    maya_out = await _stream_helper(
-        ws, llm, "maya", "Maya (Judge)",
-        MAYA_SYSTEM, maya_prompt,
-    )
+    graph = build_graph(llm, _emit)
+    try:
+        final_state = await graph.ainvoke({"document": analysis_text})
+    except (WebSocketDisconnect, asyncio.CancelledError):
+        raise
+    except Exception as exc:  # noqa: BLE001
+        log.exception("graph execution failed: %s", exc)
+        await _send(ws, {"type": "fatal",
+                         "message": f"Tribunal pipeline failed: {exc}"})
+        return
+
+    alex_out = final_state.get("alex_output", "")
+    sam_out = final_state.get("sam_output", "")
+    maya_out = final_state.get("final_maya") or final_state.get("maya_output", "")
+    specialists_used = final_state.get("selected_specialists", [])
+    specialist_reports = final_state.get("specialist_reports", {})
+    critique_dissent = bool(final_state.get("needs_revision", False))
+    revision_output = final_state.get("revision_output", "")
+    pre_validated_ruling = final_state.get("final_ruling")
 
     elapsed = round(time.perf_counter() - start, 2)
-    log.info("tribunal complete in %.2fs (chunked=%s)", elapsed, chunked)
+    log.info(
+        "tribunal complete in %.2fs (chunked=%s, specialists=%s, dissent=%s)",
+        elapsed, chunked, specialists_used, critique_dissent,
+    )
 
-    # ---- 9) Parse structured ruling ------------------------------------
-    raw = _extract_final_json(maya_out)
+    # ---- 7) Parse structured ruling ------------------------------------
     answer: FinalAnswer | None = None
-    if raw:
+    if pre_validated_ruling:
         try:
-            answer = FinalAnswer.model_validate(raw)
-            log.info("primary JSON parse succeeded")
+            answer = FinalAnswer.model_validate(pre_validated_ruling)
+            log.info("graph-supplied JSON parse succeeded")
         except ValidationError as exc:
-            log.warning("primary JSON failed schema: %s", exc)
+            log.warning("graph-supplied JSON failed schema: %s", exc)
             answer = None
-    else:
-        log.info("no JSON block found in Maya's output")
+    if answer is None:
+        raw = _extract_final_json(maya_out)
+        if raw:
+            try:
+                answer = FinalAnswer.model_validate(raw)
+                log.info("re-extracted JSON parse succeeded")
+            except ValidationError as exc:
+                log.warning("re-extracted JSON failed schema: %s", exc)
+                answer = None
+        else:
+            log.info("no JSON block found in Maya's output")
 
     if answer is None:
         await _send(ws, {
@@ -932,6 +933,10 @@ async def _run_pipeline(ws: WebSocket) -> None:
             existing.truncated = truncated
             existing.chunked = chunked
             existing.pdf_chars = original_chars
+            existing.specialists_json = json.dumps(specialists_used)
+            existing.specialist_reports_json = json.dumps(specialist_reports)
+            existing.critique_dissent = critique_dissent
+            existing.revision_output = revision_output
         else:
             db.add(VerdictCache(
                 pdf_filename=filename,
@@ -952,6 +957,10 @@ async def _run_pipeline(ws: WebSocket) -> None:
                 truncated=truncated,
                 chunked=chunked,
                 pdf_chars=original_chars,
+                specialists_json=json.dumps(specialists_used),
+                specialist_reports_json=json.dumps(specialist_reports),
+                critique_dissent=critique_dissent,
+                revision_output=revision_output,
             ))
         db.commit()
     except Exception as exc:  # noqa: BLE001
@@ -971,6 +980,8 @@ async def _run_pipeline(ws: WebSocket) -> None:
         "total_tokens": total_tokens,
         "input_tokens": input_tokens,
         "output_tokens": output_tokens,
+        "specialists": specialists_used,
+        "critique_dissent": critique_dissent,
         "model": model,
         "estimated_cost_usd": cost_usd,
         "chunked": chunked,
