@@ -52,7 +52,7 @@ When a specialist calls the tool, the top-4 matches come back as a JSON list wit
 
 ## Measured performance
 
-The headline result. End-to-end against the live Gemini API on `samples/sample_contract.pdf` in **Full multi-agent mode**:
+End-to-end run against the live Gemini API on `samples/sample_contract.pdf` in **Full multi-agent mode**:
 
 | Metric              | Value                                       |
 |---------------------|---------------------------------------------|
@@ -63,20 +63,11 @@ The headline result. End-to-end against the live Gemini API on `samples/sample_c
 | Risk score          | **95** (high risk band)                     |
 | Risks flagged       | 5 (data licence, prepayment + termination, liability cap, weak SLA, no data export) |
 
-The Full pipeline produces a strong verdict because the Planner picks specialists, each specialist calls `search_precedent` against the 34-entry knowledge base, and Maya quotes those documented mitigations in the final risk matrix rather than inventing them from training memory.
+The Planner picks the relevant specialists, each specialist calls `search_precedent` against the 34-entry knowledge base, and Maya quotes those documented mitigations in the final risk matrix rather than inventing them from training memory.
 
-### Cache layer validation
+### A note on the cache
 
-To confirm the cache mechanism works as designed I measured a cold-then-hit cycle in **Fast mode** (the lighter 3-call pipeline that exists alongside Full for free-tier days). The Fast result is not the project's headline — it is a clean measurement of the cache layer itself.
-
-| Metric              | Cold run         | Cached replay     | Change            |
-|---------------------|------------------|-------------------|-------------------|
-| Wall-clock time     | 30.65 s          | 1.68 s            | **94.5% faster**  |
-| Tokens used         | 3,768            | 0                 | 100% saved        |
-| API cost (list)     | $0.0051          | $0.0000           | 100% saved        |
-| Verdict             | CONDITIONAL-GO   | CONDITIONAL-GO    | Bit-identical     |
-
-I did not get a clean cache-hit measurement for Full mode because the free-tier daily cap on `gemini-2.5-flash` blocked a third Full run. The cache mechanism is identical in both modes — a hit issues zero API calls — so the cost saving is identical regardless of which mode populated the cache; only the wall-clock replay figure is unverified for Full.
+The cache mechanism is implemented (see `database.py` and the cache-check / cache-write blocks in `main.py`) and exercised end-to-end by `test_get_verdict_returns_full_record_when_seeded` in the unit suite. A cache hit issues zero API calls regardless of which mode populated the cache, so the dollar saving on a hit is genuinely $0.00. I did not get a clean wall-clock measurement of a Full-mode cache hit on the live API because of free-tier daily limits, so I am not reporting a speedup number for the current architecture.
 
 The cost figures are list-price equivalents at Gemini's published per-token rates. Every test ran on the free tier so the actual out-of-pocket cost was $0.00.
 
