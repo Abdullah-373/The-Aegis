@@ -162,6 +162,16 @@ Browser ───── WebSocket ─────→  FastAPI (lifespan)
 
 The API key (Gemini or OpenAI) is supplied in the first WebSocket frame. It lives only in the LLM client's memory for the duration of the request. It is never written to disk, never logged, never stored in the cache. Cached verdicts contain transcripts and the structured ruling — never the key that produced them.
 
+## Security model
+
+The app is built for **single-user, local-network use**. The defaults reflect that. Before exposing it on a wider network:
+
+- **Run behind TLS.** The API key is sent in the first WebSocket frame. Over plain `ws://` (not `wss://`) any intermediary on the network path can read it. Put nginx / Caddy / Cloudflare in front and terminate TLS there.
+- **Add authentication to `/api/history` and `/api/verdict/{id}`.** They are unscoped — anyone who can reach the port can list every cached verdict and read the full transcripts. Add an `Authorization: Bearer …` header check or a session cookie before exposing these endpoints publicly.
+- **Rate-limit the WebSocket handler.** Each Full-mode run costs 8–15 provider calls; a malicious client can drain your OpenAI credit quickly. Limit concurrent connections per IP at the reverse proxy or in middleware.
+- **The SQLite cache is single-writer.** Fine for solo use, will bottleneck on concurrent uploads. Migrate to Postgres before any deployment that expects more than one user.
+- **Cached verdicts contain the full contract text.** If your contracts are confidential, the SQLite file is a confidential artefact. Encrypt the volume at rest or set `aegis_cache.db` to be deleted on container shutdown.
+
 ## Project layout
 
 ```

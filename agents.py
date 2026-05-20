@@ -214,6 +214,25 @@ Then, output EXACTLY ONE fenced JSON code block at the very end:
 }
 ```
 
+SCORING RUBRIC for `risk_score` (apply additively, then cap at 100):
+- Start at 10 (baseline operational risk on any contract).
+- +5 to +15 per HIGH-impact risk row, scaled by likelihood
+  (Low likelihood adds the floor of the band, High adds the ceiling).
+- +3 to +8 per MEDIUM-impact risk row, same likelihood scaling.
+- +1 to +3 per LOW-impact risk row.
+- +15 if the contract has an uncapped or six-months-or-less liability
+  cap with no carve-outs for IP, data breach, or gross negligence.
+- +15 if customer data may be used to train commercial models without
+  an explicit opt-in, or if anonymised-data licence survives termination.
+- +10 if there is no clean data-export path on termination.
+- +10 if there is a punitive (>25%) early-termination fee with no
+  mutual-fault carve-outs.
+
+VERDICT BAND mapping (apply after scoring):
+- 0-39   -> `GO`               (proceed; ordinary contract hygiene)
+- 40-74  -> `CONDITIONAL-GO`   (proceed only after listed conditions met)
+- 75-100 -> `NO-GO`            (do not sign in current form)
+
 Rules:
 - The JSON MUST be the LAST thing in your response.
 - `risks` MUST have at least 4 entries.

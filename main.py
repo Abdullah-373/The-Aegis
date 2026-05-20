@@ -325,7 +325,7 @@ response. The JSON MUST validate against this schema:
 ```json
 {
   "verdict": "GO" | "NO-GO" | "CONDITIONAL-GO",
-  "risk_score": <integer 0-100, where 0=safe and 100=catastrophic>,
+  "risk_score": <integer 0-100>,
   "headline": "<one-line ruling summary, max 90 chars>",
   "risks": [
     {
@@ -338,6 +338,25 @@ response. The JSON MUST validate against this schema:
   "conditions": ["<condition>", "..."]
 }
 ```
+
+SCORING RUBRIC for `risk_score` (apply additively, then cap at 100):
+- Start at 10 (baseline operational risk on any contract).
+- +5 to +15 per HIGH-impact risk row, scaled by likelihood
+  (Low likelihood adds the floor of the band, High adds the ceiling).
+- +3 to +8 per MEDIUM-impact risk row, same likelihood scaling.
+- +1 to +3 per LOW-impact risk row.
+- +15 if the contract has an uncapped or six-months-or-less liability cap
+  with no carve-outs for IP, data breach, or gross negligence.
+- +15 if customer data may be used to train commercial models without an
+  explicit opt-in, or if anonymised-data licence survives termination.
+- +10 if there is no clean data-export path on termination.
+- +10 if there is a punitive (>25%) early-termination fee with no
+  mutual-fault carve-outs.
+
+VERDICT BAND mapping (apply after scoring):
+- 0-39   -> `GO`               (proceed; ordinary contract hygiene)
+- 40-74  -> `CONDITIONAL-GO`   (proceed only after listed conditions met)
+- 75-100 -> `NO-GO`            (do not sign in current form)
 
 Requirements:
 - The JSON block MUST be the LAST thing in your response.
@@ -472,12 +491,62 @@ def _estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
     )
 
 
-def _approx_input_tokens(*texts: str) -> int:
-    return max(1, sum(len(t) for t in texts) // 4)
+# Token counting. We prefer tiktoken when the dependency is installed and the
+# model has a registered encoder (OpenAI models do; the gpt-5 family falls
+# through to o200k_base which is the closest available encoder). Gemini and
+# anything unknown fall through to a four-chars-per-token approximation. The
+# approximation is honest within ~15% on English prose and bad on code-heavy
+# or non-ASCII text, which is why the dashboard footnotes the figures as
+# list-price estimates.
+try:
+    import tiktoken  # type: ignore
+    TIKTOKEN_AVAILABLE = True
+except Exception:  # noqa: BLE001
+    TIKTOKEN_AVAILABLE = False
+
+_TIKTOKEN_ENCODERS: dict[str, Any] = {}
 
 
-def _approx_output_tokens(text: str) -> int:
+def _tiktoken_encoder(model: str):
+    """Return a cached tiktoken encoder for `model`, or None if unavailable."""
+    if not TIKTOKEN_AVAILABLE:
+        return None
+    if model in _TIKTOKEN_ENCODERS:
+        return _TIKTOKEN_ENCODERS[model]
+    try:
+        enc = tiktoken.encoding_for_model(model)
+    except Exception:  # noqa: BLE001
+        try:
+            # gpt-5 / gpt-5-mini / new models tiktoken does not know yet —
+            # the o200k_base encoding is the right default for them.
+            enc = tiktoken.get_encoding("o200k_base")
+        except Exception:  # noqa: BLE001
+            enc = None
+    _TIKTOKEN_ENCODERS[model] = enc
+    return enc
+
+
+def _count_tokens(model: str, text: str) -> int:
+    """Count tokens for `text` against `model`. Falls back to len/4 if tiktoken
+    is missing or the model is not OpenAI-shaped (e.g. Gemini)."""
+    if not text:
+        return 1
+    if model in OPENAI_MODELS:
+        enc = _tiktoken_encoder(model)
+        if enc is not None:
+            try:
+                return max(1, len(enc.encode(text)))
+            except Exception:  # noqa: BLE001
+                pass
     return max(1, len(text) // 4)
+
+
+def _approx_input_tokens(*texts: str, model: str = DEFAULT_MODEL) -> int:
+    return sum(_count_tokens(model, t) for t in texts) or 1
+
+
+def _approx_output_tokens(text: str, *, model: str = DEFAULT_MODEL) -> int:
+    return _count_tokens(model, text)
 
 
 async def _send(ws: WebSocket, payload: dict[str, Any]) -> None:
@@ -1206,11 +1275,12 @@ async def _run_pipeline(ws: WebSocket) -> None:
         answer = _heuristic_answer(maya_out)
 
     # ---- 10) Cost --------------------------------------------------------
-    input_tokens = _approx_input_tokens(analysis_text, alex_out, sam_out)
+    # tiktoken-counted for OpenAI models, len/4-approximated for Gemini.
+    input_tokens = _approx_input_tokens(analysis_text, alex_out, sam_out, model=model)
     output_tokens = (
-        _approx_output_tokens(alex_out)
-        + _approx_output_tokens(sam_out)
-        + _approx_output_tokens(maya_out)
+        _approx_output_tokens(alex_out, model=model)
+        + _approx_output_tokens(sam_out, model=model)
+        + _approx_output_tokens(maya_out, model=model)
     )
     total_tokens = input_tokens + output_tokens
     cost_usd = _estimate_cost(model, input_tokens, output_tokens)

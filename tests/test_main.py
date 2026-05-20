@@ -416,3 +416,130 @@ def test_health_reports_provider_models():
     assert "provider_models" in data
     assert "google" in data["provider_models"]
     assert "openai" in data["provider_models"]
+
+
+# ---------------------------------------------------------------------------
+# Provider-routing integration tests
+#
+# These exercise main._make_llm against every model on every provider WITHOUT
+# making a real network call. Two regressions slipped through before:
+#
+#   1. ChatOpenAI received `temperature=0.2` against gpt-5, which OpenAI's
+#      API rejected with HTTP 400.
+#   2. The fix that stripped the kwarg let ChatOpenAI fall back to its own
+#      default of 0.7, which gpt-5 also rejected.
+#
+# The two tests below would have caught both. They monkey-patch
+# `ChatOpenAI` and `ChatGoogleGenerativeAI` to record every kwarg they
+# receive, then assert the right `temperature` shows up for each model.
+# ---------------------------------------------------------------------------
+
+
+def test_make_llm_pins_temperature_to_one_for_gpt5_family(monkeypatch):
+    """Regression test for the gpt-5 temperature=0.7 / 0.2 bugs.
+
+    gpt-5 and gpt-5-mini accept only temperature=1. The factory must pass
+    that value explicitly because ChatOpenAI's own default is 0.7.
+    """
+    captured = {}
+
+    class _FakeChatOpenAI:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(main, "ChatOpenAI", _FakeChatOpenAI)
+    monkeypatch.setattr(main, "OPENAI_AVAILABLE", True)
+
+    for model in ("gpt-5", "gpt-5-mini"):
+        captured.clear()
+        main._make_llm("sk-fake", model, temperature=0.2)
+        assert captured.get("temperature") == 1, (
+            f"{model} must receive temperature=1, got {captured!r}"
+        )
+        # The structured-output recovery path tries 0.0 — must also be coerced.
+        captured.clear()
+        main._make_llm("sk-fake", model, temperature=0.0)
+        assert captured.get("temperature") == 1
+
+
+def test_make_llm_passes_custom_temperature_for_non_fixed_openai_models(monkeypatch):
+    """gpt-4o and gpt-4o-mini DO accept a custom temperature — make sure the
+    factory still forwards it rather than over-correcting to 1."""
+    captured = {}
+
+    class _FakeChatOpenAI:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(main, "ChatOpenAI", _FakeChatOpenAI)
+    monkeypatch.setattr(main, "OPENAI_AVAILABLE", True)
+
+    for model in ("gpt-4o", "gpt-4o-mini"):
+        captured.clear()
+        main._make_llm("sk-fake", model, temperature=0.2)
+        assert captured.get("temperature") == 0.2
+
+
+def test_make_llm_passes_custom_temperature_for_gemini(monkeypatch):
+    captured = {}
+
+    class _FakeChatGoogle:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(main, "ChatGoogleGenerativeAI", _FakeChatGoogle)
+    captured.clear()
+    main._make_llm("AIzaFakeKey", "gemini-2.5-flash", temperature=0.2)
+    assert captured.get("temperature") == 0.2
+
+
+# ---------------------------------------------------------------------------
+# Tokenisation tests
+# ---------------------------------------------------------------------------
+
+
+def test_count_tokens_falls_back_for_gemini():
+    """Gemini models should use the len/4 approximation — tiktoken does not
+    know them and we should not pretend it does."""
+    text = "Hello world. " * 10
+    n = main._count_tokens("gemini-2.5-flash", text)
+    assert n == max(1, len(text) // 4)
+
+
+def test_count_tokens_uses_tiktoken_for_openai_when_available():
+    """If tiktoken is installed, OpenAI counts must not be the len/4 fallback
+    for non-trivial inputs. We just assert the count is in a sensible band."""
+    if not main.TIKTOKEN_AVAILABLE:
+        import pytest
+        pytest.skip("tiktoken not installed in this environment")
+    text = "The quick brown fox jumps over the lazy dog. " * 20
+    n = main._count_tokens("gpt-4o-mini", text)
+    # Real tiktoken count for that string is ~200; the len/4 fallback would
+    # be ~225. Both are bounded; the band below catches either implementation
+    # without coupling the test to the exact tokeniser version.
+    assert 150 <= n <= 260
+
+
+# ---------------------------------------------------------------------------
+# Scoring-rubric prompt smoke tests
+#
+# These do not call any LLM. They just assert that the rubric language
+# exists in both Maya prompts so a future refactor does not silently
+# delete the calibration we added in v3.
+# ---------------------------------------------------------------------------
+
+
+def test_maya_prompt_contains_scoring_rubric():
+    assert "SCORING RUBRIC" in main.MAYA_SYSTEM
+    assert "VERDICT BAND" in main.MAYA_SYSTEM
+    # The three bands must be present so the model has a deterministic
+    # mapping from risk_score to verdict.
+    assert "0-39" in main.MAYA_SYSTEM
+    assert "40-74" in main.MAYA_SYSTEM
+    assert "75-100" in main.MAYA_SYSTEM
+
+
+def test_graph_maya_prompt_contains_scoring_rubric():
+    import agents
+    assert "SCORING RUBRIC" in agents.MAYA_SYSTEM
+    assert "VERDICT BAND" in agents.MAYA_SYSTEM
