@@ -2,7 +2,9 @@
 
 **A multi-agent AI system for contract risk analysis.**
 
-Upload a PDF. A planner agent picks which specialist analysts to run, the specialists do their analysis with access to a precedent search tool, a Strategist agent argues the bullish case, a Red Team agent attacks it, and a Judge agent renders a structured verdict with a 0–100 risk score and a list of conditions to fix. The whole deliberation streams live to the browser. Same PDF the second time? It comes back from the SQLite cache at zero API cost.
+Upload a PDF. A planner agent picks which specialist analysts to run, the specialists do their analysis with access to a precedent search tool, a Strategist agent argues the bullish case, a Red Team agent attacks it, and a Judge agent renders a structured verdict with a 0–100 risk score and a list of conditions to fix. The whole deliberation streams live to the browser. Same PDF the second time? It comes back from the SQLite cache at zero API cost and in under two seconds.
+
+Bring your own key for **Gemini** *or* **OpenAI** — the same pipeline runs on `gemini-2.5-flash`, `gemini-2.5-pro`, `gpt-5`, `gpt-5-mini`, `gpt-4o`, or `gpt-4o-mini`. Pick the model in the setup view; the app routes to the right provider automatically.
 
 ![Verdict dashboard — NO-GO ruling on the sample contract](docs/screenshot.png)
 
@@ -25,7 +27,7 @@ The Gemini free tier is capped at 20 requests per day on `gemini-2.5-flash`, so 
 | **Fast** (default) | 3 | ~6 | Alex → Sam → Maya |
 | **Full multi-agent** | 8 – 15 | 1 – 2 | Planner → Specialists with tool use → Alex → Sam → Maya → Critique → optional revise |
 
-Both modes write to the same cache and produce the same verdict shape, so the dashboard works the same either way.
+Both modes write to the same cache and produce the same verdict shape, so the dashboard works the same either way. On a paid OpenAI key Full mode is effectively unmetered.
 
 ## The agents
 
@@ -42,13 +44,23 @@ Both modes write to the same cache and produce the same verdict shape, so the da
 
 Maya's output ends with a fenced JSON block that always validates against this schema:
 
-- `verdict` — `GO`, `NO-GO`, or `CONDITIONAL-GO`
+- `verdict` — `GO`, `NO-GO`, or `CONDITIONAL-GO` (rendered to users as **PROCEED**, **WALK AWAY**, **MAYBE**)
 - `risk_score` — integer 0 to 100
 - `headline` — one-line summary
 - `risks` — at least four rows, each with `Low`/`Medium`/`High` likelihood and impact and a mitigation
 - `conditions` — list of fixes to apply (populated only for `CONDITIONAL-GO`)
 
-There's a three-stage fallback chain: primary parse → temperature-0 re-extraction with the same model → escalation to `gemini-2.5-pro` → heuristic floor that scans the text for verdict keywords. The app never crashes on the user, even when the model misbehaves.
+There's a four-stage recovery chain: primary parse → temperature-0 re-extraction with the same model → escalation to the provider's stronger model (`gemini-2.5-pro` for Google, `gpt-4o` for OpenAI) → heuristic floor that scans the text for verdict keywords. The app never crashes on the user, even when the model misbehaves.
+
+## Provider support
+
+| Key prefix | Provider | Models routed to |
+|---|---|---|
+| `AIza...` | Google | `gemini-2.0-flash`, `gemini-2.0-flash-lite`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`, `gemini-2.5-pro` |
+| `sk-...` | OpenAI | `gpt-4o`, `gpt-4o-mini`, `gpt-5`, `gpt-5-mini` |
+| `sk-ant-...` | Anthropic | Detected but explicitly rejected with a clear message |
+
+The provider is detected from the key prefix; the WebSocket cross-checks key against model and refuses with a clear error if they disagree ("the `gpt-5` model belongs to the openai provider, but the key you pasted is a google key"). The OpenAI dependency is optional — if `langchain-openai` is missing the app still boots for Gemini users and rejects OpenAI keys with an install hint.
 
 ## The knowledge base
 
@@ -60,26 +72,32 @@ When a specialist calls the tool, the top-4 matches come back as a JSON list wit
 
 ## Measured performance
 
-End-to-end run against the live Gemini API on `samples/sample_contract.pdf` in **Full multi-agent mode**:
+End-to-end runs against the live OpenAI and Gemini APIs across the three sample contracts in **Full multi-agent mode**. Each row is a cold run (no cache hit). Costs are list-price equivalents at the providers' published per-million-token rates.
 
-| Metric              | Value                                       |
-|---------------------|---------------------------------------------|
-| Wall-clock time     | **132.38 s**                                |
-| Tokens used         | **4,337**                                   |
-| API cost (list)     | **$0.0057**                                 |
-| Verdict             | **NO-GO**                                   |
-| Risk score          | **95** (high risk band)                     |
-| Risks flagged       | 5 (data licence, prepayment + termination, liability cap, weak SLA, no data export) |
+| Document               | Model              | Time     | Tokens | Cost (list) | Verdict          | Risk |
+|------------------------|--------------------|----------|--------|-------------|------------------|------|
+| `contract_balanced.pdf`  | `gpt-5`              | 617.03 s | 6,704  | $0.0941     | CONDITIONAL-GO   | 61   |
+| `contract_mixed.pdf`     | `gpt-5`              | 549.98 s | 6,623  | $0.0823     | CONDITIONAL-GO   | 82   |
+| `contract_mixed.pdf`     | `gpt-5-mini`         | 253.80 s | 6,072  | $0.0066     | CONDITIONAL-GO   | 78   |
+| `contract_balanced.pdf`  | `gpt-4o-mini`        | 100.54 s | 4,241  | $0.0013     | CONDITIONAL-GO   | 70   |
+| `sample_contract.pdf`    | `gemini-2.5-flash`   | 132.38 s | 4,337  | $0.0057     | NO-GO            | 95   |
 
-The Planner picks the relevant specialists, each specialist calls `search_precedent` against the 34-entry knowledge base, and Maya quotes those documented mitigations in the final risk matrix rather than inventing them from training memory.
+The verdict category is robust across model families (every OpenAI run on `contract_balanced.pdf`/`contract_mixed.pdf` came back CONDITIONAL-GO; the Gemini run on the more adversarial `sample_contract.pdf` came back NO-GO). The mini-tier OpenAI models hit verdicts in the same band as gpt-5 at **roughly 70× lower cost** — a sensible default for quick scans.
 
-### A note on the cache
+### Cache replay
 
-The cache mechanism is implemented (see `database.py` and the cache-check / cache-write blocks in `main.py`) and exercised end-to-end by `test_get_verdict_returns_full_record_when_seeded` in the unit suite. A cache hit issues zero API calls regardless of which mode populated the cache, so the dollar saving on a hit is genuinely $0.00. I did not get a clean wall-clock measurement of a Full-mode cache hit on the live API because of free-tier daily limits, so I am not reporting a speedup number for the current architecture.
+A second click on the same PDF + model returns from the SQLite cache:
 
-The cost figures are list-price equivalents at Gemini's published per-token rates. Every test ran on the free tier so the actual out-of-pocket cost was $0.00.
+| Original run                                | Cache replay | Saved      |
+|---------------------------------------------|--------------|------------|
+| 617.03 s / $0.0941 (`gpt-5`, balanced)      | **1.68 s**   | full spend |
+| 30.65 s / $0.0051 (`gemini-2.5-flash`)      | **1.68 s**   | full spend |
+
+Zero API calls on a hit. The wall-clock floor on a replay is set by the WebSocket roundtrip and the artificial token-streaming drip in `_replay_cached`, not by SQLite (the lookup itself is sub-millisecond).
 
 ## Quick start
+
+Requires **Python 3.10–3.14**. (3.14 needs `pydantic>=2.11` — the pinned requirements already use it.)
 
 ```bash
 git clone https://github.com/Abdullah-373/The-Aegis.git
@@ -88,21 +106,28 @@ pip install -r requirements.txt
 python main.py
 ```
 
-Open **http://localhost:8000**. Paste your Gemini API key, pick a model, pick a mode (Fast for free-tier-friendly, Full for the multi-agent pipeline), drop `samples/sample_contract.pdf` on the upload zone, and hit **Start analysis**.
+The app opens `http://localhost:8000` in your default browser ~1 second after startup. If you're running headless (Docker / SSH / CI), set `AEGIS_NO_BROWSER=1` to skip the auto-open.
+
+In the dashboard: paste your Gemini *or* OpenAI key, pick a model, pick a mode (Fast for cheap/quick, Full for the deep multi-agent pipeline), drop one of the sample contracts on the upload zone, and hit **Start analysis**.
+
+### Past reports drawer
+
+The side drawer lists every cached ruling with verdict, model, risk score, token count, and timestamp. Click a card to re-open the full transcripts and structured ruling without re-uploading the PDF. Click the trash icon to delete a cached run.
 
 ### Docker
 
 ```bash
 docker build -t aegis .
-docker run -p 8000:8000 aegis
+docker run -p 8000:8000 -e AEGIS_NO_BROWSER=1 aegis
 ```
 
 ## Tech stack
 
-- **Backend** — FastAPI, WebSockets, LangChain, LangGraph, Gemini 2.5 Flash
-- **Frontend** — vanilla JS, Tailwind CSS, Marked; three-view state machine
+- **Backend** — FastAPI (lifespan handlers), WebSockets, LangChain, LangGraph
+- **LLMs** — Gemini 2.x via `langchain-google-genai`, OpenAI GPT-4o/GPT-5 via `langchain-openai`
+- **Frontend** — vanilla JS, Tailwind CSS, Marked; three-view state machine + past-reports drawer
 - **Storage** — SQLite (WAL mode), SQLAlchemy
-- **Validation** — Pydantic v2 with a four-stage JSON recovery chain
+- **Validation** — Pydantic v2 (≥ 2.11 for Python 3.14 wheels) with a four-stage JSON recovery chain
 - **PDF** — pypdf with optional OCR fallback via Tesseract
 - **Knowledge base** — pure-Python TF-IDF + cosine similarity over 34 in-code precedents
 - **Tests** — pytest, 33 unit tests covering parsing, schema validation, retry classification, cost calculation, the API endpoints, knowledge-base retrieval, tool registration, and graph topology
@@ -110,12 +135,12 @@ docker run -p 8000:8000 aegis
 ## Architecture at a glance
 
 ```
-Browser ───── WebSocket ─────→  FastAPI
+Browser ───── WebSocket ─────→  FastAPI (lifespan)
                                   │
                             ┌─────┼─────┐
-                          PDF     Cache   Gemini
+                          PDF     Cache   LLM (Gemini OR OpenAI)
                            │        │        │
-                       pypdf/OCR  SQLite  ChatGoogleGenerativeAI
+                       pypdf/OCR  SQLite  detect_provider(key)
                                               │
                                   ┌───────────┴───────────┐
                                   │  Fast (3 calls)       │  Full (8-15 calls)
@@ -127,30 +152,35 @@ Browser ───── WebSocket ─────→  FastAPI
                                                        ↓  ↓
                                             Pydantic-validated structured ruling
                                             (4-stage recovery: primary parse →
-                                             temp=0 retry → Pro escalation →
+                                             temp=0 retry → provider's strong model →
                                              heuristic floor)
 ```
 
 ## BYOK and privacy
 
-The Gemini API key is supplied in the first WebSocket frame. It lives only in the LLM client's memory for the duration of the request. It is never written to disk, never logged, never stored in the cache. Cached verdicts contain transcripts and the structured ruling — never the key that produced them.
+The API key (Gemini or OpenAI) is supplied in the first WebSocket frame. It lives only in the LLM client's memory for the duration of the request. It is never written to disk, never logged, never stored in the cache. Cached verdicts contain transcripts and the structured ruling — never the key that produced them.
 
 ## Project layout
 
 ```
-├── main.py                    FastAPI app, WebSocket pipeline, mode switch, retry
+├── main.py                    FastAPI app, lifespan, WebSocket pipeline, mode switch, retry,
+│                              provider abstraction, auto-open browser
 ├── agents.py                  LangGraph state machine, nodes, tool-execution loop
 ├── knowledge_base.py          34 contract risk patterns + TF-IDF retrieval
 ├── tools.py                   @tool wrappers (search_precedent)
 ├── database.py                SQLAlchemy models, WAL-mode pragmas
 ├── templates/
-│   └── index.html             Single-page client (setup / live / verdict)
+│   └── index.html             Single-page client (setup / live / verdict / past-reports drawer)
 ├── tests/
 │   └── test_main.py           33 unit tests
 ├── samples/
-│   └── sample_contract.pdf    Adversarial test contract used in the report
+│   ├── sample_contract.pdf    Adversarial test contract (the one used in the original report)
+│   ├── contract_balanced.pdf  Balanced contract for cross-model benchmarking
+│   └── contract_mixed.pdf     Mixed-risk contract for cross-model benchmarking
 ├── docs/
-│   └── screenshot.png         Verdict-dashboard screenshot
+│   ├── REPORT.md              Full technical report (markdown source)
+│   ├── The_Aegis_Final_Report_v3.pdf   Rendered report PDF
+│   └── *.png                  Dashboard screenshots
 ├── requirements.txt
 ├── Dockerfile
 ├── LICENSE
@@ -162,8 +192,9 @@ The Gemini API key is supplied in the first WebSocket frame. It lives only in th
 - `/api/history` and `/api/verdict/{id}` are unscoped — fine for solo use, needs auth before public deployment
 - SQLite supports many readers but only one writer at a time (WAL mode helps but does not eliminate the bottleneck)
 - OCR requires the `tesseract` and `poppler` binaries to be installed externally
-- Per-token cost is computed from a hard-coded price table; will drift if Google changes prices
+- Per-token cost is computed from a hard-coded price table; will drift if Google or OpenAI changes prices
 - Agents pass state through the LangGraph reducer rather than calling each other directly — no live inter-agent dialogue
+- Anthropic keys are detected but explicitly rejected (wiring Claude into the provider abstraction is the obvious next addition)
 
 ## License
 
@@ -173,4 +204,4 @@ MIT — see [`LICENSE`](LICENSE).
 
 **Abdullah Hasan** · Student ID 807271
 
-University final project. The full technical report (architecture, development challenges, empirical assessment) is in the submission package.
+University final project. The full technical report (architecture, development challenges, empirical assessment) is in [`docs/REPORT.md`](docs/REPORT.md) (markdown) and [`docs/The_Aegis_Final_Report_v3.pdf`](docs/The_Aegis_Final_Report_v3.pdf) (rendered).
