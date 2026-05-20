@@ -20,6 +20,8 @@ Measured against the live OpenAI and Gemini APIs across three sample contracts a
 
 I ran every test against live APIs; the dollar figures are list-price equivalents at the providers' published per-token rates.
 
+![The verdict dashboard on a NO-GO ruling. The radial gauge, the verdict word in semantic colour, and the four-row metrics column on the right (time, tokens, cost, model) are the same for every run regardless of which model produced the answer.](screenshot.png)
+
 ---
 
 ## 1. The Problem
@@ -130,6 +132,8 @@ The cache row stores the transcripts, the verdict, the risk score, the structure
 The frontend is one HTML file. Three views plus a side drawer, all driven by a small state machine in JavaScript. Setup view collects the API key, model (grouped by provider), mode, and PDF. Live-analysis view shows three cards (Alex / Sam / Maya) streaming Markdown live as tokens arrive, with the planner and specialist activity in the footer log. Verdict dashboard shows a radial risk gauge, the verdict word in semantic colour (GO → "PROCEED", NO-GO → "WALK AWAY", CONDITIONAL-GO → "MAYBE"), a four-row metrics column (time, tokens, cost, model), the risk matrix, the conditions list (when applicable), and a collapsible transcripts panel. A **Past reports** drawer slides in from the side with cached rulings tagged by verdict, model, token count, and timestamp, so the user can re-open or delete previous runs without re-uploading the PDF.
 
 Ctrl+Enter from setup starts the run. Esc cancels a running analysis or closes the open panel.
+
+![Live tribunal transcripts. Alex (Strategist), Sam (Red Team), and Maya (Judge) stream side by side as their tokens arrive over the WebSocket. Sam quotes Alex's exact claims and dismantles them; Maya reads both transcripts and renders the structured ruling.](screenshot_transcripts.png)
 
 ---
 
@@ -271,6 +275,8 @@ A similar replay against a previous `gemini-2.5-flash` run on `sample_contract.p
 The Full pipeline samples at non-zero temperature (`0.2`), and the Planner can pick between two and five specialists, and tool-call queries are model-chosen. The three sources of variance compound. Re-running `sample_contract.pdf` on `gemini-2.5-flash` in Full mode with cache disabled produced NO-GO with risk 95 on the first run and CONDITIONAL-GO with risk 88 on the second. Both runs identified the same five core problems; they disagreed on the recommendation tone (walk away vs. fix and proceed) and on which model output the Judge weighted most heavily.
 
 The cache eliminates this variance for repeat queries on the same document — that is the cache's job. Cold runs on the same document will continue to drift between adjacent verdict bands, which is the expected behaviour for sampled LLM output, not a bug.
+
+![Run B on the same PDF as the abstract's headline run: CONDITIONAL-GO ("MAYBE") with risk score 88 and eight specific conditions. The structured ruling exposes the variance — the agents found the same five core problems but disagreed on whether to walk away or fix and proceed.](screenshot_maybe88.png)
 
 ### 5.4 Verdict quality
 
