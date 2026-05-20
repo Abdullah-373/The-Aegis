@@ -77,15 +77,15 @@ When a specialist calls the tool, the top-4 matches come back as a JSON list wit
 
 ## Measured performance
 
-End-to-end runs on the two sample contracts. Both PDFs are over the 100,000-character extractor limit, so both ran through the map-reduce condensation path. Costs are list-price equivalents; the four-decimal figures come from the verdict exports committed at [`docs/sample_verdicts/`](docs/sample_verdicts/).
+End-to-end runs on the two sample contracts. Both PDFs are over the 100,000-character extractor limit, so both ran through the map-reduce condensation path. Costs are list-price equivalents. The `gpt-4o-mini` row's four-decimal figure matches the verdict export committed at [`docs/sample_verdicts/contract_balanced__gpt-4o-mini.json`](docs/sample_verdicts/contract_balanced__gpt-4o-mini.json); the `gpt-5-mini` figures are read off the dashboard screenshots in [`docs/`](docs/).
 
 | Document               | Model         | Time     | Tokens | Cost (list) | Verdict          | Risk |
 |------------------------|---------------|----------|--------|-------------|------------------|------|
-| `contract_balanced.pdf`| `gpt-5-mini`  | 268.25 s | 5,864  | $0.0034     | CONDITIONAL-GO   | 78   |
+| `contract_balanced.pdf`| `gpt-5-mini`  | 298.03 s | 5,864  | $0.0034     | CONDITIONAL-GO   | 78   |
 | `contract_balanced.pdf`| `gpt-4o-mini` | 100.54 s | 4,241  | $0.001422   | CONDITIONAL-GO   | 70   |
 | `contract_mixed.pdf`   | `gpt-5-mini`  | 268.25 s | 5,227  | $0.0038     | CONDITIONAL-GO   | 85   |
 
-All three runs land in the same verdict band (CONDITIONAL-GO). The score moves by 7 to 15 points across model and document — the agents agree on whether to sign with conditions but disagree on how nervous to be about it. The mini-tier models reach the same band as gpt-5 at **roughly 67× lower dollar cost** — for the "quick scan to decide if I need to read this myself" use case, `gpt-4o-mini` is the default-default.
+All three runs land in the same verdict band (CONDITIONAL-GO). The score moves by 7 to 15 points across model and document — the agents agree on whether to sign with conditions but disagree on how nervous to be about it. On the balanced contract `gpt-4o-mini` reaches the same band as `gpt-5-mini` at **about 2.4× lower cost and 3× lower latency** — for the "quick scan to decide if I need to read this myself" use case, it's the default-default.
 
 ### Cache replay
 
@@ -93,7 +93,7 @@ A second click on the same PDF and the same model returns from the SQLite cache:
 
 | Original run                                | Cache replay | API spend on replay | Compute saved |
 |---------------------------------------------|--------------|---------------------|---------------|
-| `gpt-5-mini` on `contract_balanced.pdf` (268.25 s, $0.0034)  | **< 100 ms** | **$0.00** | full 268.25 s |
+| `gpt-5-mini` on `contract_balanced.pdf` (298.03 s, $0.0034)  | **< 100 ms** | **$0.00** | full 298.03 s |
 | `gpt-5-mini` on `contract_mixed.pdf` (268.25 s, $0.0038)     | **< 100 ms** | **$0.00** | full 268.25 s |
 | `gpt-4o-mini` on `contract_balanced.pdf` (100.54 s, $0.0014) | **< 100 ms** | **$0.00** | full 100.54 s |
 
