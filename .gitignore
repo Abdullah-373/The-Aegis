@@ -15,6 +15,3 @@ aegis_cache.db
 # is not — re-run `npm install && npm run build:css` after changing
 # templates/index.html or tailwind.config.js.
 node_modules/
-
-# Editor / IDE caches that should never be tracked.
-.claude/
