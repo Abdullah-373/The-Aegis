@@ -198,8 +198,11 @@ def _make_llm(api_key: str, model: str, temperature: float = 0.2):
                 "Install it with: pip install langchain-openai"
             )
         # ChatOpenAI uses `api_key` rather than the provider-named arg.
+        # The gpt-5 family ONLY accepts temperature=1 (OpenAI's API default).
+        # ChatOpenAI's own default is 0.7, not 1.0, so omitting the kwarg
+        # does not work — we have to pass temperature=1 explicitly.
         if model in FIXED_TEMPERATURE_MODELS:
-            return ChatOpenAI(api_key=api_key, model=model)
+            return ChatOpenAI(api_key=api_key, model=model, temperature=1)
         return ChatOpenAI(
             api_key=api_key, model=model, temperature=temperature,
         )
