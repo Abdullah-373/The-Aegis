@@ -9,3 +9,9 @@ aegis_cache.db
 .DS_Store
 .idea/
 .vscode/
+
+# Frontend build artifacts. The compiled stylesheet (templates/styles.css)
+# IS checked in so deployments don't need a Node toolchain. node_modules
+# is not — re-run `npm install && npm run build:css` after changing
+# templates/index.html or tailwind.config.js.
+node_modules/

@@ -120,8 +120,21 @@ The side drawer lists every cached ruling with verdict, model, risk score, token
 
 ```bash
 docker build -t aegis .
-docker run -p 8000:8000 -e AEGIS_NO_BROWSER=1 aegis
+docker run -p 8000:8000 aegis
 ```
+
+The Dockerfile is multi-stage: a Node stage pre-builds the Tailwind stylesheet, then the Python runtime image copies it in. The runtime image is Node-free.
+
+### Rebuilding the frontend stylesheet
+
+The dashboard's CSS is pre-built into `templates/styles.css` (committed). If you edit `templates/index.html` or `tailwind.config.js`, regenerate it:
+
+```bash
+npm install
+npm run build:css
+```
+
+The output is ~17 KB minified and contains only the classes the template actually uses (plus a small safelist for verdict colours built at runtime). The previous build pulled Tailwind from `cdn.tailwindcss.com`, which shipped the JIT compiler to the browser on every page load.
 
 ## Tech stack
 

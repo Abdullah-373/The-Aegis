@@ -4,30 +4,18 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>The Aegis — Document Risk Analysis</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<!--
+  Tailwind is pre-built at deploy time (npm run build:css). The previous
+  build pulled tailwindcss from a CDN, which shipped the entire JIT
+  compiler to the browser on every page load. The pre-built stylesheet
+  below is ~17 KB minified and contains only the classes this template
+  actually uses (plus a small safelist of runtime-built verdict colours).
+-->
+<link rel="stylesheet" href="/static/styles.css">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<script>
-  tailwind.config = {
-    theme: {
-      extend: {
-        fontFamily: {
-          sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-          mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
-        },
-        colors: {
-          ink: {
-            900: '#0b1220', 800: '#1a2236', 700: '#2a3349',
-            600: '#475569', 500: '#64748b', 400: '#94a3b8',
-            300: '#cbd5e1', 200: '#e2e8f0', 100: '#f1f5f9', 50: '#f8fafc',
-          },
-        },
-      },
-    },
-  };
-</script>
 <style>
   html { scroll-behavior: smooth; }
   body {

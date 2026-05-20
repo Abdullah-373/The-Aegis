@@ -37,7 +37,8 @@ warnings.filterwarnings(
 )
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -263,6 +264,12 @@ app = FastAPI(
     lifespan=_lifespan,
 )
 templates = Jinja2Templates(directory="templates")
+
+# Serve the pre-built Tailwind stylesheet (and any other static assets we
+# add later) from /static. The stylesheet itself is checked into the repo
+# at templates/styles.css; the source CSS and Tailwind config are at the
+# repository root.
+app.mount("/static", StaticFiles(directory="templates"), name="static")
 
 init_db()
 
@@ -833,6 +840,11 @@ async def _replay_cached(ws: WebSocket, cached: VerdictCache) -> None:
         "truncated": cached.truncated,
     })
 
+    # Replay cached transcripts as ONE frame per agent rather than dripping
+    # them in 64-char chunks with a sleep between each. The drip was pure UI
+    # animation; it inflated the reported cache-hit wall-clock from
+    # sub-100ms into the ~1.7s range. With this change the cache replay
+    # reaches the dashboard as fast as the WebSocket round-trip allows.
     for helper_id, text in (
         ("alex", cached.alex_output),
         ("sam",  cached.sam_output),
@@ -843,17 +855,14 @@ async def _replay_cached(ws: WebSocket, cached: VerdictCache) -> None:
             "type": "helper_start", "helper": helper_id,
             "name": f"{name} ({HELPERS[helper_id]['role']})",
         })
-        step = 64
-        for i in range(0, len(text), step):
+        if text:
             await _send(ws, {
-                "type": "helper_token", "helper": helper_id,
-                "token": text[i:i + step],
+                "type": "helper_token", "helper": helper_id, "token": text,
             })
-            await asyncio.sleep(0.003)
         await _send(ws, {
             "type": "helper_end", "helper": helper_id,
             "chars": len(text),
-            "est_tokens": _approx_output_tokens(text),
+            "est_tokens": _approx_output_tokens(text, model=cached.model_used),
         })
 
     await _send(ws, {

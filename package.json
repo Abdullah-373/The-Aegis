@@ -1,0 +1,12 @@
+{
+  "name": "the-aegis-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tailwind build for The Aegis dashboard",
+  "scripts": {
+    "build:css": "tailwindcss -i ./templates/styles.src.css -o ./templates/styles.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.0"
+  }
+}
