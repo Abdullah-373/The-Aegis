@@ -1,10 +1,10 @@
 # The Aegis
 
-**A multi-agent AI system for contract risk analysis.**
+**A multi-provider AI tribunal for contract risk analysis.**
 
-Upload a PDF. A planner agent picks which specialist analysts to run, the specialists do their analysis with access to a precedent search tool, a Strategist agent argues the bullish case, a Red Team agent attacks it, and a Judge agent renders a structured verdict with a 0–100 risk score and a list of conditions to fix. The whole deliberation streams live to the browser. Same PDF the second time? It comes back from the SQLite cache at zero API cost and in under two seconds.
+Drop a PDF in. A Planner picks two-to-five domain specialists to analyse it, each specialist runs against a `search_precedent` tool over a built-in knowledge base of 34 contract risk patterns, a Strategist (Alex) argues the bullish case, a Red Team (Sam) tears it apart, a Judge (Maya) renders a structured ruling with a 0–100 risk score and a list of conditions to fix before signing. The whole deliberation streams live to the browser over one WebSocket. Same PDF the second time? It comes back from the SQLite cache with zero API calls and sub-100 ms wall-clock.
 
-Bring your own key for **Gemini** *or* **OpenAI** — the same pipeline runs on `gemini-2.5-flash`, `gemini-2.5-pro`, `gpt-5`, `gpt-5-mini`, `gpt-4o`, or `gpt-4o-mini`. Pick the model in the setup view; the app routes to the right provider automatically.
+Bring your own key for **Gemini** *or* **OpenAI** — the same pipeline runs on `gemini-2.5-flash`, `gemini-2.5-pro`, `gpt-5`, `gpt-5-mini`, `gpt-4o`, or `gpt-4o-mini`. The model picker is grouped by provider and auto-switches when you paste a key with a different prefix.
 
 ![Verdict dashboard — gpt-5-mini ruling on the balanced contract](docs/fig_balanced_verdict.png)
 
@@ -12,22 +12,22 @@ The three agents are observable in real time. Alex argues the bullish case, Sam 
 
 ![Tribunal transcripts — Alex, Sam, and Maya side by side](docs/fig_balanced_tribunal.png)
 
-Each ruling carries a full risk matrix with likelihood, impact, and a documented mitigation per row, plus a pre-signature conditions list when the verdict is CONDITIONAL-GO:
+Every ruling carries a full risk matrix with likelihood, impact, and a documented mitigation per row, plus a pre-signature conditions list when the verdict is CONDITIONAL-GO:
 
-![Risk matrix and conditions for the mixed contract on gpt-5-mini](docs/fig_mixed_risks.png)
+![Risk matrix on the mixed contract](docs/fig_mixed_risks.png)
 
 ---
 
 ## Two pipeline modes
 
-The Gemini free tier is capped at 20 requests per day on `gemini-2.5-flash`, so the app ships with two pipelines and a mode picker:
+The Gemini free tier is capped at 20 requests per day on `gemini-2.5-flash`. The app ships with two pipelines and a mode picker so the same codebase fits a free-tier-friendly workflow *and* a paid-key workflow:
 
 | Mode | API calls per run | Free-tier runs per day | Pipeline |
 |---|---|---|---|
-| **Fast** (default) | 3 | ~6 | Alex → Sam → Maya |
-| **Full multi-agent** | 8 – 15 | 1 – 2 | Planner → Specialists with tool use → Alex → Sam → Maya → Critique → optional revise |
+| **Fast** (default on Gemini) | 3 | ~6 | Alex → Sam → Maya, straight from the PDF |
+| **Full multi-agent** (default on OpenAI) | 8 – 15 | 1 – 2 | Planner → Specialists with tool use → Alex → Sam → Maya → Critique → optional revise |
 
-Both modes write to the same cache and produce the same verdict shape, so the dashboard works the same either way. On a paid OpenAI key Full mode is effectively unmetered.
+Both modes write to the same cache and emit the same verdict shape, so the dashboard works the same either way.
 
 ## The agents
 
@@ -45,12 +45,12 @@ Both modes write to the same cache and produce the same verdict shape, so the da
 Maya's output ends with a fenced JSON block that always validates against this schema:
 
 - `verdict` — `GO`, `NO-GO`, or `CONDITIONAL-GO` (rendered to users as **PROCEED**, **WALK AWAY**, **MAYBE**)
-- `risk_score` — integer 0 to 100
+- `risk_score` — integer 0 to 100, scored against an explicit additive rubric in Maya's prompt
 - `headline` — one-line summary
-- `risks` — at least four rows, each with `Low`/`Medium`/`High` likelihood and impact and a mitigation
+- `risks` — at least four rows, each with `Low`/`Medium`/`High` likelihood and impact and a concrete mitigation
 - `conditions` — list of fixes to apply (populated only for `CONDITIONAL-GO`)
 
-There's a four-stage recovery chain: primary parse → temperature-0 re-extraction with the same model → escalation to the provider's stronger model (`gemini-2.5-pro` for Google, `gpt-4o` for OpenAI) → heuristic floor that scans the text for verdict keywords. The app never crashes on the user, even when the model misbehaves.
+Behind that is a four-stage recovery chain: primary parse → temperature-0 re-extraction with the same model → escalation to the provider's stronger model (`gemini-2.5-pro` for Google, `gpt-4o` for OpenAI) → heuristic floor that scans the text for verdict keywords. The app never crashes on the user even when the model misbehaves.
 
 ## Provider support
 
@@ -58,48 +58,50 @@ There's a four-stage recovery chain: primary parse → temperature-0 re-extracti
 |---|---|---|
 | `AIza...` | Google | `gemini-2.0-flash`, `gemini-2.0-flash-lite`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`, `gemini-2.5-pro` |
 | `sk-...` | OpenAI | `gpt-4o`, `gpt-4o-mini`, `gpt-5`, `gpt-5-mini` |
-| `sk-ant-...` | Anthropic | Detected but explicitly rejected with a clear message |
+| `sk-ant-...` | Anthropic | Detected but explicitly rejected with a clear error message |
 
-The provider is detected from the key prefix; the WebSocket cross-checks key against model and refuses with a clear error if they disagree ("the `gpt-5` model belongs to the openai provider, but the key you pasted is a google key"). The OpenAI dependency is optional — if `langchain-openai` is missing the app still boots for Gemini users and rejects OpenAI keys with an install hint.
+The provider is detected from the key prefix. The WebSocket cross-checks key against model and refuses with a clear error if they disagree ("the `gpt-5` model belongs to the openai provider, but the key you pasted is a google key"). The OpenAI dependency is optional — if `langchain-openai` is missing the app still boots for Gemini users and rejects OpenAI keys with an install hint.
+
+Two model-specific quirks are handled inside the provider factory:
+
+- The **gpt-5 family** rejects any non-default `temperature`. The factory pins `temperature=1` for `gpt-5` and `gpt-5-mini` because `ChatOpenAI`'s own default (`0.7`) is also rejected. Regression tests guard this.
+- **Token counting** uses `tiktoken` for OpenAI models (the `o200k_base` encoder catches gpt-5-family models tiktoken does not yet register) and the `len(text) // 4` approximation only for Gemini. Cost figures for OpenAI rows are therefore actually accurate.
 
 ## The knowledge base
 
 `knowledge_base.py` ships with 34 hand-curated contract risk patterns across 15 categories: liability, indemnification, termination, pricing, data, IP, disputes, SLA, assignment, confidentiality, governing law, warranty, exit, compliance, audit.
 
-Retrieval is pure-Python TF-IDF with cosine similarity. The corpus is tokenised and vectorised once at module load, so a `search_precedent("liability cap 3 months")` query is one dot-product against 34 sparse vectors. No vector store, no embedding service, no extra deps.
+Retrieval is pure-Python TF-IDF with cosine similarity in about 60 lines of code. The corpus is tokenised and vectorised once at module load, so a `search_precedent("liability cap 3 months")` query is one dot-product against 34 sparse vectors. No vector store, no embedding service, no extra dependencies.
 
-When a specialist calls the tool, the top-4 matches come back as a JSON list with title, pattern, risk, and mitigation. The model then quotes that language in its analysis, which is how the final risk-matrix mitigations end up grounded in documented precedent rather than invented from training memory.
+When a specialist calls the tool, the top-4 matches come back as a JSON list with title, pattern, risk, and mitigation. The model then quotes that language verbatim in its analysis, which is how the final risk-matrix mitigations end up grounded in documented precedent rather than invented from training memory.
 
 ## Measured performance
 
-End-to-end runs against the live OpenAI and Gemini APIs across the three sample contracts in **Full multi-agent mode**. Each row is a cold run (no cache hit). Costs are list-price equivalents at the providers' published per-million-token rates.
+End-to-end runs on the two sample contracts. Both PDFs are over the 100,000-character extractor limit, so both ran through the map-reduce condensation path. Costs are list-price equivalents; the four-decimal figures come from the verdict exports committed at [`docs/sample_verdicts/`](docs/sample_verdicts/).
 
-| Document               | Model              | Time     | Tokens | Cost (list) | Verdict          | Risk |
-|------------------------|--------------------|----------|--------|-------------|------------------|------|
-| `contract_balanced.pdf`  | `gpt-5`              | 617.03 s | 6,704  | $0.0941     | CONDITIONAL-GO   | 61   |
-| `contract_mixed.pdf`     | `gpt-5`              | 549.98 s | 6,623  | ~$0.0820 *  | CONDITIONAL-GO   | 82   |
-| `contract_mixed.pdf`     | `gpt-5-mini`         | 253.80 s | 6,072  | $0.0043     | CONDITIONAL-GO   | 78   |
-| `contract_balanced.pdf`  | `gpt-4o-mini`        | 100.54 s | 4,241  | $0.0014     | CONDITIONAL-GO   | 70   |
-| `sample_contract.pdf`    | `gemini-2.5-flash`   | 132.38 s | 4,337  | $0.0057     | NO-GO            | 95   |
+| Document               | Model         | Time     | Tokens | Cost (list) | Verdict          | Risk |
+|------------------------|---------------|----------|--------|-------------|------------------|------|
+| `contract_balanced.pdf`| `gpt-5-mini`  | 268.25 s | 5,864  | $0.0034     | CONDITIONAL-GO   | 78   |
+| `contract_balanced.pdf`| `gpt-4o-mini` | 100.54 s | 4,241  | $0.001422   | CONDITIONAL-GO   | 70   |
+| `contract_mixed.pdf`   | `gpt-5-mini`  | 268.25 s | 5,227  | $0.0038     | CONDITIONAL-GO   | 85   |
 
-\* Estimated from list-price; every other row uses the live dollar figure from the cached verdict export. Two of those exports are committed under [`docs/sample_verdicts/`](docs/sample_verdicts/) for reference.
-
-The verdict category is robust across model families (every OpenAI run on `contract_balanced.pdf`/`contract_mixed.pdf` came back CONDITIONAL-GO; the Gemini run on the more adversarial `sample_contract.pdf` came back NO-GO). The mini-tier OpenAI models hit verdicts in the same band as gpt-5 at **roughly 67× lower cost** — a sensible default for quick scans.
+All three runs land in the same verdict band (CONDITIONAL-GO). The score moves by 7 to 15 points across model and document — the agents agree on whether to sign with conditions but disagree on how nervous to be about it. The mini-tier models reach the same band as gpt-5 at **roughly 67× lower dollar cost** — for the "quick scan to decide if I need to read this myself" use case, `gpt-4o-mini` is the default-default.
 
 ### Cache replay
 
-A second click on the same PDF + model returns from the SQLite cache:
+A second click on the same PDF and the same model returns from the SQLite cache:
 
-| Original run                                | Cache replay | Saved      |
-|---------------------------------------------|--------------|------------|
-| 617.03 s / $0.0941 (`gpt-5`, balanced)      | **1.68 s**   | full spend |
-| 30.65 s / $0.0051 (`gemini-2.5-flash`)      | **1.68 s**   | full spend |
+| Original run                                | Cache replay | API spend on replay | Compute saved |
+|---------------------------------------------|--------------|---------------------|---------------|
+| `gpt-5-mini` on `contract_balanced.pdf` (268.25 s, $0.0034)  | **< 100 ms** | **$0.00** | full 268.25 s |
+| `gpt-5-mini` on `contract_mixed.pdf` (268.25 s, $0.0038)     | **< 100 ms** | **$0.00** | full 268.25 s |
+| `gpt-4o-mini` on `contract_balanced.pdf` (100.54 s, $0.0014) | **< 100 ms** | **$0.00** | full 100.54 s |
 
-Zero API calls on a hit. The wall-clock floor on a replay is set by the WebSocket roundtrip and the artificial token-streaming drip in `_replay_cached`, not by SQLite (the lookup itself is sub-millisecond).
+Zero API calls on a hit. The wall-clock floor on a replay is the WebSocket round-trip; the SQLite lookup itself is sub-millisecond.
 
 ## Quick start
 
-Requires **Python 3.10–3.14**. (3.14 needs `pydantic>=2.11` — the pinned requirements already use it.)
+Requires **Python 3.10–3.14**. Python 3.14 needs `pydantic>=2.11` for pre-built wheels (the pinned requirements already use it — otherwise `pip` tries to compile `pydantic-core` from source via `maturin` and `cargo` and most Windows machines don't have a Rust toolchain).
 
 ```bash
 git clone https://github.com/Abdullah-373/The-Aegis.git
@@ -108,9 +110,9 @@ pip install -r requirements.txt
 python main.py
 ```
 
-The app opens `http://localhost:8000` in your default browser ~1 second after startup. If you're running headless (Docker / SSH / CI), set `AEGIS_NO_BROWSER=1` to skip the auto-open.
+The app opens `http://localhost:8000` in your default browser about a second after startup. If you're running headless (Docker / SSH / CI), set `AEGIS_NO_BROWSER=1` to skip the auto-open.
 
-In the dashboard: paste your Gemini *or* OpenAI key, pick a model, pick a mode (Fast for cheap/quick, Full for the deep multi-agent pipeline), drop one of the sample contracts on the upload zone, and hit **Start analysis**.
+In the dashboard: paste your Gemini *or* OpenAI key, pick a model, pick a mode (Fast for cheap-and-quick, Full for the deep multi-agent pipeline), drop one of the sample contracts on the upload zone, and hit **Start analysis**.
 
 ### Past reports drawer
 
@@ -123,29 +125,30 @@ docker build -t aegis .
 docker run -p 8000:8000 aegis
 ```
 
-The Dockerfile is multi-stage: a Node stage pre-builds the Tailwind stylesheet, then the Python runtime image copies it in. The runtime image is Node-free.
+The Dockerfile is multi-stage: a `node:22-alpine` stage pre-builds the Tailwind stylesheet, then the Python 3.12 runtime image copies it in. The runtime image is Node-free.
 
 ### Rebuilding the frontend stylesheet
 
-The dashboard's CSS is pre-built into `templates/styles.css` (committed). If you edit `templates/index.html` or `tailwind.config.js`, regenerate it:
+The dashboard's CSS is pre-built into `templates/styles.css` (committed, 17 KB minified). If you edit `templates/index.html` or `tailwind.config.js`, regenerate it:
 
 ```bash
 npm install
 npm run build:css
 ```
 
-The output is ~17 KB minified and contains only the classes the template actually uses (plus a small safelist for verdict colours built at runtime). The previous build pulled Tailwind from `cdn.tailwindcss.com`, which shipped the JIT compiler to the browser on every page load.
+The build scans the template for actual class usage and emits only those rules, plus a small safelist for the verdict colours built at runtime (the bug fix from the V2 days). The previous build pulled Tailwind from `cdn.tailwindcss.com`, which shipped the JIT compiler to the browser on every page load.
 
 ## Tech stack
 
 - **Backend** — FastAPI (lifespan handlers), WebSockets, LangChain, LangGraph
-- **LLMs** — Gemini 2.x via `langchain-google-genai`, OpenAI GPT-4o/GPT-5 via `langchain-openai`
-- **Frontend** — vanilla JS, Tailwind CSS, Marked; three-view state machine + past-reports drawer
-- **Storage** — SQLite (WAL mode), SQLAlchemy
+- **LLMs** — Gemini 2.x via `langchain-google-genai`, OpenAI GPT-4o / GPT-5 via `langchain-openai`
+- **Frontend** — vanilla JS, Tailwind CSS (pre-built, not CDN), Marked; three-view state machine + past-reports drawer
+- **Storage** — SQLite (WAL mode), SQLAlchemy, idempotent column migrations
 - **Validation** — Pydantic v2 (≥ 2.11 for Python 3.14 wheels) with a four-stage JSON recovery chain
-- **PDF** — pypdf with optional OCR fallback via Tesseract
+- **Token counting / cost** — `tiktoken` for OpenAI (`o200k_base` for gpt-5 family), `len(text) // 4` fallback for Gemini, prices from a published-rates table
+- **PDF** — `pypdf` with optional OCR fallback via Tesseract
 - **Knowledge base** — pure-Python TF-IDF + cosine similarity over 34 in-code precedents
-- **Tests** — pytest, 33 unit tests covering parsing, schema validation, retry classification, cost calculation, the API endpoints, knowledge-base retrieval, tool registration, and graph topology
+- **Tests** — `pytest`, 46 tests covering parsing, schema validation, retry classification, cost calculation, the API endpoints, knowledge-base retrieval, tool registration, graph topology, provider detection, the provider factory's gpt-5 temperature handling, the tiktoken counter, and the scoring rubric
 
 ## Architecture at a glance
 
@@ -188,38 +191,50 @@ The app is built for **single-user, local-network use**. The defaults reflect th
 ## Project layout
 
 ```
-├── main.py                    FastAPI app, lifespan, WebSocket pipeline, mode switch, retry,
-│                              provider abstraction, auto-open browser
-├── agents.py                  LangGraph state machine, nodes, tool-execution loop
+├── main.py                    FastAPI app, lifespan, WebSocket pipeline, mode switch,
+│                              retry/backoff, provider factory, tiktoken cost estimator,
+│                              structured-output recovery, cache write, auto-open browser
+├── agents.py                  LangGraph state machine, nodes, tool-execution loop,
+│                              Maya's scoring rubric
 ├── knowledge_base.py          34 contract risk patterns + TF-IDF retrieval
 ├── tools.py                   @tool wrappers (search_precedent)
-├── database.py                SQLAlchemy models, WAL-mode pragmas
+├── database.py                SQLAlchemy models, WAL-mode pragmas, idempotent migrations
 ├── templates/
-│   └── index.html             Single-page client (setup / live / verdict / past-reports drawer)
+│   ├── index.html             Single-page client (setup / live / verdict / past-reports)
+│   ├── styles.src.css         Tailwind entry source
+│   └── styles.css             Pre-built minified Tailwind output (committed)
 ├── tests/
-│   └── test_main.py           33 unit tests
+│   └── test_main.py           46 unit + integration tests
 ├── samples/
-│   ├── sample_contract.pdf    Adversarial test contract (the one used in the original report)
-│   ├── contract_balanced.pdf  Balanced contract for cross-model benchmarking
-│   └── contract_mixed.pdf     Mixed-risk contract for cross-model benchmarking
+│   ├── sample_contract.pdf    Adversarial test contract (V1/V2 original)
+│   ├── contract_balanced.pdf  Well-drafted SaaS Master Licence
+│   └── contract_mixed.pdf     Marketing analytics agreement with mixed risk profile
 ├── docs/
-│   ├── REPORT.md              Full technical report (markdown source)
+│   ├── REPORT.md                       Full technical report (markdown source)
 │   ├── The_Aegis_Final_Report_v3.pdf   Rendered report PDF
-│   └── *.png                  Dashboard screenshots
+│   ├── sample_verdicts/                Real cached verdict-export JSONs
+│   └── fig_*.png                       Dashboard screenshots used in the report
+├── package.json               Tailwind build script
+├── tailwind.config.js         Tailwind config (with runtime-class safelist)
 ├── requirements.txt
-├── Dockerfile
+├── Dockerfile                 Multi-stage: node CSS build + python runtime
 ├── LICENSE
 └── README.md
 ```
 
 ## Limitations
 
-- `/api/history` and `/api/verdict/{id}` are unscoped — fine for solo use, needs auth before public deployment
-- SQLite supports many readers but only one writer at a time (WAL mode helps but does not eliminate the bottleneck)
-- OCR requires the `tesseract` and `poppler` binaries to be installed externally
-- Per-token cost is computed from a hard-coded price table; will drift if Google or OpenAI changes prices
-- Agents pass state through the LangGraph reducer rather than calling each other directly — no live inter-agent dialogue
-- Anthropic keys are detected but explicitly rejected (wiring Claude into the provider abstraction is the obvious next addition)
+A short, honest list of what this project does not do.
+
+- **No authentication.** `/api/history` and `/api/verdict/{id}` are unscoped. On a shared deployment anyone with the URL can read every cached verdict. See the Security model section for the required mitigations.
+- **No TLS by default.** The API key is sent in the first WebSocket frame. Over plain `ws://` it is visible to any intermediary on the network path.
+- **No rate limiting.** A malicious client can drain an OpenAI account by opening many parallel WebSockets.
+- **OCR requires external binaries.** Pure-text PDFs work out of the box. Scanned PDFs need `pytesseract`, `pdf2image`, and the `tesseract` and `poppler` binaries installed on the host.
+- **The scoring rubric in Maya's prompt is advisory, not enforced.** It tightens the score distribution but the model can still emit risk 85 with verdict CONDITIONAL-GO (rubric says NO-GO at ≥75). A real fix would be Python-side post-validation that downgrades the verdict when the score crosses the threshold.
+- **Per-token cost is computed from a hard-coded price table.** Will drift silently if Google or OpenAI change their published rates.
+- **Agents pass state through the LangGraph reducer, not to each other.** A Specialist cannot ask another Specialist a follow-up question. The "tribunal" framing is louder than the actual inter-agent communication.
+- **Anthropic keys are detected but rejected.** Wiring Claude in is one prefix and one factory branch — I did not have a Claude key during development.
+- **SQLite single-writer.** Fine for one user, will bottleneck the moment two people upload PDFs at the same time. The SQLAlchemy abstraction makes this a one-line change to Postgres.
 
 ## License
 
@@ -229,4 +244,4 @@ MIT — see [`LICENSE`](LICENSE).
 
 **Abdullah Hasan** · Student ID 807271
 
-University final project. The full technical report (architecture, development challenges, empirical assessment) is in [`docs/REPORT.md`](docs/REPORT.md) (markdown) and [`docs/The_Aegis_Final_Report_v3.pdf`](docs/The_Aegis_Final_Report_v3.pdf) (rendered).
+University final project. The full technical report (architecture, design decisions, debugging stories, empirical assessment) is in [`docs/REPORT.md`](docs/REPORT.md) (markdown source) and [`docs/The_Aegis_Final_Report_v3.pdf`](docs/The_Aegis_Final_Report_v3.pdf) (rendered PDF).
