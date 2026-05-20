@@ -6,15 +6,15 @@ Upload a PDF. A planner agent picks which specialist analysts to run, the specia
 
 Bring your own key for **Gemini** *or* **OpenAI** — the same pipeline runs on `gemini-2.5-flash`, `gemini-2.5-pro`, `gpt-5`, `gpt-5-mini`, `gpt-4o`, or `gpt-4o-mini`. Pick the model in the setup view; the app routes to the right provider automatically.
 
-![Verdict dashboard — NO-GO ruling on the sample contract](docs/screenshot.png)
+![Verdict dashboard — gpt-5-mini ruling on the balanced contract](docs/fig_balanced_verdict.png)
 
 The three agents are observable in real time. Alex argues the bullish case, Sam quotes Alex and dismantles each point, Maya reads both and rules:
 
-![Tribunal transcripts — Alex, Sam, and Maya side by side](docs/screenshot_transcripts.png)
+![Tribunal transcripts — Alex, Sam, and Maya side by side](docs/fig_balanced_tribunal.png)
 
-The pipeline is not strictly deterministic, so running the same PDF a second time can produce a softer verdict that surfaces the same risks but recommends fixing them rather than walking away:
+Each ruling carries a full risk matrix with likelihood, impact, and a documented mitigation per row, plus a pre-signature conditions list when the verdict is CONDITIONAL-GO:
 
-![Run B on the same PDF — CONDITIONAL-GO (MAYBE) with eight conditions](docs/screenshot_maybe88.png)
+![Risk matrix and conditions for the mixed contract on gpt-5-mini](docs/fig_mixed_risks.png)
 
 ---
 
