@@ -23,7 +23,8 @@ import logging
 import re
 import time
 import warnings
-from typing import Any, Literal
+from contextlib import asynccontextmanager
+from typing import Any, AsyncIterator, Literal
 
 # Silence the LangChain → Pydantic V1 shim warning on Python 3.14. The shim
 # functionality we don't use is broken under 3.14; the bits we do use work
@@ -195,17 +196,11 @@ HELPERS = {
     "maya": {"name": "Maya", "role": "Judge",      "tag": "renders the ruling"},
 }
 
-app = FastAPI(title="The Aegis", description="Three AI agents review your PDF")
-templates = Jinja2Templates(directory="templates")
-
-init_db()
-
-
-@app.on_event("startup")
-async def _log_startup() -> None:
+@asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Single OCR-status log line at server boot.
 
-    Logging this from a startup event rather than at module import time
+    Logging this from a lifespan handler rather than at module import time
     avoids the duplicate-message issue when uvicorn imports `main` twice
     (once as the entry-point script, once again to resolve `main:app`).
     """
@@ -216,6 +211,17 @@ async def _log_startup() -> None:
             "OCR not available — install pytesseract, pdf2image and the "
             "tesseract binary to enable scanned-PDF support"
         )
+    yield
+
+
+app = FastAPI(
+    title="The Aegis",
+    description="Three AI agents review your PDF",
+    lifespan=_lifespan,
+)
+templates = Jinja2Templates(directory="templates")
+
+init_db()
 
 
 # ---------------------------------------------------------------------------
