@@ -165,11 +165,26 @@ def model_provider(model: str) -> str | None:
     return None
 
 
+# Models that hard-reject any non-default `temperature` value. The gpt-5
+# family raises HTTP 400 "Unsupported value: 'temperature' does not support
+# X with this model. Only the default (1) value is supported." if you pass
+# anything other than 1 (or omit the arg). The structured-output recovery
+# and the main pipeline both try to set custom temperatures, so we have to
+# strip the argument for these models rather than pass it through.
+FIXED_TEMPERATURE_MODELS = {
+    "gpt-5",
+    "gpt-5-mini",
+}
+
+
 def _make_llm(api_key: str, model: str, temperature: float = 0.2):
     """Construct the right LangChain chat model for the given API key.
 
     Falls back to a Pydantic / LangChain default temperature semantics —
-    same parameter name, different normalisation across providers.
+    same parameter name, different normalisation across providers. For
+    models in FIXED_TEMPERATURE_MODELS we omit the kwarg entirely so the
+    provider uses its hard-coded default (which is the only value it
+    accepts).
     """
     provider = detect_provider(api_key)
     if provider == "google":
@@ -183,6 +198,8 @@ def _make_llm(api_key: str, model: str, temperature: float = 0.2):
                 "Install it with: pip install langchain-openai"
             )
         # ChatOpenAI uses `api_key` rather than the provider-named arg.
+        if model in FIXED_TEMPERATURE_MODELS:
+            return ChatOpenAI(api_key=api_key, model=model)
         return ChatOpenAI(
             api_key=api_key, model=model, temperature=temperature,
         )
