@@ -247,16 +247,18 @@ I ran the Full pipeline against the three sample contracts in the repository usi
 | Document               | Model              | Time     | Tokens | Cost (list) | Verdict          | Risk |
 |------------------------|--------------------|----------|--------|-------------|------------------|------|
 | contract_balanced.pdf  | gpt-5              | 617.03 s | 6,704  | $0.0941     | CONDITIONAL-GO   | 61   |
-| contract_mixed.pdf     | gpt-5              | 549.98 s | 6,623  | $0.0823     | CONDITIONAL-GO   | 82   |
-| contract_mixed.pdf     | gpt-5-mini         | 253.80 s | 6,072  | $0.0066     | CONDITIONAL-GO   | 78   |
-| contract_balanced.pdf  | gpt-4o-mini        | 100.54 s | 4,241  | $0.0013     | CONDITIONAL-GO   | 70   |
+| contract_mixed.pdf     | gpt-5              | 549.98 s | 6,623  | ~$0.0820 *  | CONDITIONAL-GO   | 82   |
+| contract_mixed.pdf     | gpt-5-mini         | 253.80 s | 6,072  | $0.0043     | CONDITIONAL-GO   | 78   |
+| contract_balanced.pdf  | gpt-4o-mini        | 100.54 s | 4,241  | $0.0014     | CONDITIONAL-GO   | 70   |
 | sample_contract.pdf    | gemini-2.5-flash   | 132.38 s | 4,337  | $0.0057     | NO-GO            | 95   |
+
+\* The `gpt-5` cost on `contract_mixed.pdf` is an estimate from the published per-token price; every other row is the live dollar figure stored in the cached verdict export (see `docs/sample_verdicts/`).
 
 Three observations are worth pulling out of the table.
 
 **The verdict is robust across model families.** Every OpenAI run on `contract_balanced.pdf` and `contract_mixed.pdf` came back CONDITIONAL-GO; the Gemini run on the older, more adversarial `sample_contract.pdf` came back NO-GO. The agents disagreed on the *score* by tens of points across models — 61 vs 70 on the same balanced contract is real variance — but they agreed on the *category*. The structured-ruling design is the reason that variance is visible at all: with a free-form summariser there is no number to compare.
 
-**`gpt-5-mini` and `gpt-4o-mini` are wildly cheaper than `gpt-5` for very similar verdicts.** The full gpt-5 run on `contract_balanced.pdf` cost $0.0941; the gpt-4o-mini run on the same document cost $0.0013. That is a 72× cost reduction for a verdict that landed in the same band (CONDITIONAL-GO, scores 61 vs 70). For the use case "quick scan to decide if you need to read the contract yourself," mini-tier OpenAI models are the obvious default.
+**`gpt-5-mini` and `gpt-4o-mini` are wildly cheaper than `gpt-5` for very similar verdicts.** The full gpt-5 run on `contract_balanced.pdf` cost $0.0941; the gpt-4o-mini run on the same document cost $0.0014. That is a ~67× cost reduction for a verdict that landed in the same band (CONDITIONAL-GO, scores 61 vs 70). For the use case "quick scan to decide if you need to read the contract yourself," mini-tier OpenAI models are the obvious default. The `gpt-5-mini` row on `contract_mixed.pdf` reinforces the point: $0.0043 for a fully-formed CONDITIONAL-GO ruling with 11 risks and 13 negotiated conditions — the verdict export for that run is preserved as `docs/sample_verdicts/contract_mixed__gpt-5-mini.json` for inspection.
 
 **Wall-clock time is dominated by the strongest model.** A Full run on `gpt-5` (~10 minutes) is roughly six times slower than the same pipeline on `gpt-4o-mini` (~1.5 minutes). The architecture is the same; the bottleneck is the per-call latency of the model, which compounds across the planner-plus-specialists-plus-tribunal call chain.
 

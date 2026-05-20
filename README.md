@@ -77,12 +77,14 @@ End-to-end runs against the live OpenAI and Gemini APIs across the three sample 
 | Document               | Model              | Time     | Tokens | Cost (list) | Verdict          | Risk |
 |------------------------|--------------------|----------|--------|-------------|------------------|------|
 | `contract_balanced.pdf`  | `gpt-5`              | 617.03 s | 6,704  | $0.0941     | CONDITIONAL-GO   | 61   |
-| `contract_mixed.pdf`     | `gpt-5`              | 549.98 s | 6,623  | $0.0823     | CONDITIONAL-GO   | 82   |
-| `contract_mixed.pdf`     | `gpt-5-mini`         | 253.80 s | 6,072  | $0.0066     | CONDITIONAL-GO   | 78   |
-| `contract_balanced.pdf`  | `gpt-4o-mini`        | 100.54 s | 4,241  | $0.0013     | CONDITIONAL-GO   | 70   |
+| `contract_mixed.pdf`     | `gpt-5`              | 549.98 s | 6,623  | ~$0.0820 *  | CONDITIONAL-GO   | 82   |
+| `contract_mixed.pdf`     | `gpt-5-mini`         | 253.80 s | 6,072  | $0.0043     | CONDITIONAL-GO   | 78   |
+| `contract_balanced.pdf`  | `gpt-4o-mini`        | 100.54 s | 4,241  | $0.0014     | CONDITIONAL-GO   | 70   |
 | `sample_contract.pdf`    | `gemini-2.5-flash`   | 132.38 s | 4,337  | $0.0057     | NO-GO            | 95   |
 
-The verdict category is robust across model families (every OpenAI run on `contract_balanced.pdf`/`contract_mixed.pdf` came back CONDITIONAL-GO; the Gemini run on the more adversarial `sample_contract.pdf` came back NO-GO). The mini-tier OpenAI models hit verdicts in the same band as gpt-5 at **roughly 70× lower cost** — a sensible default for quick scans.
+\* Estimated from list-price; every other row uses the live dollar figure from the cached verdict export. Two of those exports are committed under [`docs/sample_verdicts/`](docs/sample_verdicts/) for reference.
+
+The verdict category is robust across model families (every OpenAI run on `contract_balanced.pdf`/`contract_mixed.pdf` came back CONDITIONAL-GO; the Gemini run on the more adversarial `sample_contract.pdf` came back NO-GO). The mini-tier OpenAI models hit verdicts in the same band as gpt-5 at **roughly 67× lower cost** — a sensible default for quick scans.
 
 ### Cache replay
 
