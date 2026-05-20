@@ -20,9 +20,11 @@ import hashlib
 import io
 import json
 import logging
+import os
 import re
 import time
 import warnings
+import webbrowser
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Literal
 
@@ -196,11 +198,25 @@ HELPERS = {
     "maya": {"name": "Maya", "role": "Judge",      "tag": "renders the ruling"},
 }
 
+async def _open_browser_when_ready(url: str, delay: float = 1.0) -> None:
+    """Open the dashboard in the user's default browser after a short delay.
+
+    The delay gives uvicorn a moment to finish binding the socket so the
+    new tab does not race the server and show "site can't be reached".
+    """
+    await asyncio.sleep(delay)
+    try:
+        webbrowser.open(url, new=2)
+        log.info("opened dashboard in default browser: %s", url)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("could not auto-open browser: %s", exc)
+
+
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Single OCR-status log line at server boot.
+    """Single OCR-status log line at server boot, plus auto-open browser.
 
-    Logging this from a lifespan handler rather than at module import time
+    Logging from a lifespan handler rather than at module import time
     avoids the duplicate-message issue when uvicorn imports `main` twice
     (once as the entry-point script, once again to resolve `main:app`).
     """
@@ -211,6 +227,13 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             "OCR not available — install pytesseract, pdf2image and the "
             "tesseract binary to enable scanned-PDF support"
         )
+    # Auto-open the dashboard in the default browser on first launch. The
+    # uvicorn reloader imports the app twice; the env-var guard ensures we
+    # only open the tab once. Users running headless (CI, Docker, SSH) can
+    # opt out by setting AEGIS_NO_BROWSER=1.
+    if not os.environ.get("AEGIS_NO_BROWSER") and not os.environ.get("AEGIS_BROWSER_OPENED"):
+        os.environ["AEGIS_BROWSER_OPENED"] = "1"
+        asyncio.create_task(_open_browser_when_ready("http://localhost:8000"))
     yield
 
 
