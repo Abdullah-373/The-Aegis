@@ -168,6 +168,29 @@ Six phases.
 
 The whole sequence streams over one WebSocket so the browser sees every token as it arrives.
 
+To make that concrete, here is what the three voices actually produced on a single risk row from a real run on `contract_balanced.pdf`. The clause in question: an annual subscription of USD 96,000, invoiced quarterly in advance, with renewal increases capped at the lesser of CPI + 2% or 5%.
+
+Alex, given access to the Planner's specialist reports, builds the strongest possible case to sign:
+
+> Predictable, low-friction start: annual subscription is only USD 96,000 (Clause 3), invoiced quarterly in advance — delivers an immediate, single-vendor solution at a known cost and predictable quarterly cashflow. Renewal increases are capped at the lesser of CPI + 2% or 5% (Clause 3). That cap materially limits inflation risk and makes multi-year budgeting and ROI modelling straightforward.
+
+Sam reads Alex's case, quotes each claim verbatim, and dismantles it with a precedent ID from the knowledge base attached to every attack:
+
+> *"Annual subscription is only USD 96,000 ... invoiced quarterly in advance."*
+> False comfort. That \$96k is prepaid and refundable only for Vendor's material breach — not for insolvency, sustained SLA failures, or convenience exit. Prepayment ties up cash and yields weak recovery risk (Financial Analyst finding 1; precedent: `non_refundable_prepayment`).
+>
+> *"Renewal increases are capped at the lesser of CPI + 2% or 5%."*
+> Technically true but misleading. Compounded annual uplifts still ratchet your costs materially over time; there is no market-bench reset or right to re-price against alternatives.
+
+Maya then reads both sides and rules. Her output begins with a markdown rationale and ends with a fenced JSON block:
+
+> **RATIONALE**
+> The contract offers clear commercial benefits: predictable pricing, explicit prohibition on model-training on Customer Data, and a baseline of SOC 2 / ISO 27001 attestation. However, material operational and compliance gaps remain — notably weak subprocess/flow-down and audit rights, a short paid-only data-export/transition window, limited SLA remedies and ambiguous support, and a low liability cap with narrow indemnities. Those high-impact, high-likelihood exposures could produce outsized operational, regulatory and financial harm and are not sufficiently mitigated in the current draft.
+
+The JSON block that follows the rationale is what the dashboard actually consumes. It validates against the Pydantic schema (`FinalAnswer` in §3) and contains the integer risk score, a `Literal["GO", "NO-GO", "CONDITIONAL-GO"]` verdict, a risk-matrix array with likelihood and impact per row, and a conditions array when the verdict is CONDITIONAL-GO. Downstream code never has to parse Maya's prose — it reads the structured object directly. That separation, prose for humans and structured JSON for machines, is the single most important design decision in the project.
+
+Three things to notice in the example above. First, Alex's argument is a complete, defensible case in isolation; if you only ever read Alex you would sign. Second, Sam never argues in the abstract — every attack starts by quoting Alex's exact words, which is how the transcript stays auditable: a reviewer can trace any objection back to the specific claim it is answering. Third, Maya does not pick a winner. She emits a verdict band ("CONDITIONAL-GO"), a risk score (78), and a list of pre-signature redlines — the contract is signable, but only after specific things change. That structured-output shape is the difference between this app and a single LLM summary: a downstream system can act on it.
+
 ![Alex / Sam / Maya transcripts streaming side by side from a Full-mode run on the balanced contract. Alex opens with the USD 96,000 annual subscription and the predictable cashflow; Sam quotes Alex's exact claim and dismantles it; Maya writes the rationale that becomes the JSON ruling.](fig_balanced_tribunal.png){ width=90% }
 
 ### 4.3 The provider router
