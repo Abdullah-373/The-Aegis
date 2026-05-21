@@ -15,3 +15,7 @@ aegis_cache.db
 # is not — re-run `npm install && npm run build:css` after changing
 # templates/index.html or tailwind.config.js.
 node_modules/
+
+# Locally-rendered report PDF. Not committed; regenerated from
+# docs/REPORT.md via pandoc when needed for submission.
+docs/The_Aegis_Final_Report_v3.pdf
