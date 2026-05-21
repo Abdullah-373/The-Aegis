@@ -23,10 +23,11 @@ header-includes:
   - \definecolor{aegisslate}{HTML}{1E293B}
   - \definecolor{aegisamberpale}{HTML}{FEF3C7}
   - \definecolor{aegisslatepale}{HTML}{F1F5F9}
-  - \usepackage{sectsty}
-  - \sectionfont{\color{aegisblue}}
-  - \subsectionfont{\color{aegisbluedark}}
-  - \subsubsectionfont{\color{aegisbluedark}}
+  - \usepackage{titlesec}
+  - \titleformat{\section}{\Large\bfseries\sffamily\color{aegisblue}}{\textcolor{aegisblue}{\rule[-3pt]{4pt}{18pt}}\hspace{10pt}}{0pt}{}
+  - \titleformat{name=\section,numberless}{\Large\bfseries\sffamily\color{aegisblue}}{\textcolor{aegisblue}{\rule[-3pt]{4pt}{18pt}}\hspace{10pt}}{0pt}{}
+  - \titleformat{\subsection}{\large\bfseries\sffamily\color{aegisbluedark}}{}{0pt}{}
+  - \titleformat{\subsubsection}{\normalsize\bfseries\sffamily\color{aegisbluedark}}{}{0pt}{}
   - \usepackage{booktabs}
   - \usepackage{colortbl}
   - \usepackage{array}
@@ -47,6 +48,7 @@ header-includes:
   - \usepackage{graphicx}
   - \usepackage{tcolorbox}
   - \tcbuselibrary{breakable,skins}
+  - \AtBeginDocument{\renewenvironment{Shaded}{\begin{tcolorbox}[enhanced,colback=aegisslatepale,frame hidden,sharp corners,borderline west={3pt}{0pt}{aegisblue},left=10pt,right=10pt,top=5pt,bottom=5pt,breakable]}{\end{tcolorbox}}}
   - \usepackage{float}
   - \floatplacement{figure}{htbp}
   - \setlength{\textfloatsep}{18pt plus 4pt minus 2pt}
@@ -56,8 +58,9 @@ header-includes:
   - \usepackage{fancyhdr}
   - \pagestyle{fancy}
   - \fancyhf{}
-  - \fancyhead[R]{\thepage}
+  - \fancyfoot[C]{\thepage}
   - \setlength{\headheight}{14pt}
+  - \setlength{\footskip}{42pt}
 ---
 
 Source code: [github.com/Abdullah-373/The-Aegis](https://github.com/Abdullah-373/The-Aegis)
@@ -165,7 +168,7 @@ Six phases.
 
 The whole sequence streams over one WebSocket so the browser sees every token as it arrives.
 
-![Alex / Sam / Maya transcripts streaming side by side from a Full-mode run on the balanced contract. Alex opens with the USD 96,000 annual subscription and the predictable cashflow; Sam quotes Alex's exact claim and dismantles it; Maya writes the rationale that becomes the JSON ruling.](fig_balanced_tribunal.png){ width=100% }
+![Alex / Sam / Maya transcripts streaming side by side from a Full-mode run on the balanced contract. Alex opens with the USD 96,000 annual subscription and the predictable cashflow; Sam quotes Alex's exact claim and dismantles it; Maya writes the rationale that becomes the JSON ruling.](fig_balanced_tribunal.png){ width=90% }
 
 ### 4.3 The provider router
 
@@ -200,7 +203,7 @@ One SQLite table. Key: `SHA-256(extracted_text + model_name)`. Stored on a hit: 
 
 A cache hit replays the cached transcripts to the browser as one WebSocket frame per agent. The SQLite lookup is sub-millisecond; the wall-clock floor on a replay is the WebSocket round-trip, under 100 ms in normal use. The previous build (before commit `0067800`) dripped the transcripts back in 64-character chunks with a 3 ms `asyncio.sleep` between each. Looked like a live stream, inflated the reported wall-clock from sub-100 ms into ~1.7 s. §5.11 covers why I yanked it.
 
-![Verdict card for the `gpt-5-mini` run on `contract_balanced.pdf`. Risk score 78 (CONDITIONAL-GO), 5,864 tokens, \$0.0034 of API spend, 298.03 s wall-clock. The DOCUMENT TRUNCATED tag means the source PDF was over the 100,000-character limit and ran through the map-reduce condense path.](fig_balanced_verdict.png){ width=100% }
+![Verdict card for the `gpt-5-mini` run on `contract_balanced.pdf`. Risk score 78 (CONDITIONAL-GO), 5,864 tokens, \$0.0034 of API spend, 298.03 s wall-clock. The DOCUMENT TRUNCATED tag means the source PDF was over the 100,000-character limit and ran through the map-reduce condense path.](fig_balanced_verdict.png){ width=90% }
 
 ### 4.7 The UI
 
@@ -216,7 +219,7 @@ A **Past Reports drawer** lists previous cached rulings with verdict, risk score
 
 `Ctrl+Enter` from setup starts the run. `Esc` cancels a running analysis or closes the open panel.
 
-![Risk matrix from the mixed-contract run on gpt-5-mini. Eight rows, each with likelihood and impact in {Low, Medium, High} and a concrete mitigation written from a knowledge-base precedent the specialist pulled in during analysis.](fig_mixed_risks.png){ width=100% }
+![Risk matrix from the mixed-contract run on gpt-5-mini. Eight rows, each with likelihood and impact in {Low, Medium, High} and a concrete mitigation written from a knowledge-base precedent the specialist pulled in during analysis.](fig_mixed_risks.png){ width=90% }
 
 ---
 
@@ -405,7 +408,7 @@ A second click on the same PDF and the same model returns from the SQLite cache.
 
 Zero API calls on a hit. The wall-clock floor is the WebSocket round-trip (the SQLite lookup itself is sub-millisecond). The headline replay number used to be ~1.7 s, but that was mostly the drip-feed animation from §5.11; the post-`0067800` build returns the cached transcripts in one frame per agent and the replay arrives as fast as the socket allows.
 
-![The mixed-contract verdict card on a cache replay. The `FROM CACHE · 268.25S · SAVED 268.25S` pills show the run hit the cache, replayed in under a second of wall-clock at the browser, and spent zero on the OpenAI API. The headline ("Allow a tightly scoped, paid pilot only under a separate SOW and one-page Pilot Addendum") was emitted by gpt-5-mini and stored in the cache row.](fig_mixed_verdict.png){ width=100% }
+![The mixed-contract verdict card on a cache replay. The `FROM CACHE · 268.25S · SAVED 268.25S` pills show the run hit the cache, replayed in under a second of wall-clock at the browser, and spent zero on the OpenAI API. The headline ("Allow a tightly scoped, paid pilot only under a separate SOW and one-page Pilot Addendum") was emitted by gpt-5-mini and stored in the cache row.](fig_mixed_verdict.png){ width=90% }
 
 ### 6.4 Non-determinism between runs
 
@@ -425,11 +428,11 @@ The cache eliminates this variance for repeat queries on the same document, whic
 
 The risk-matrix mitigations are grounded in documented knowledge-base entries, not made up from training memory. The mixed-contract run on gpt-5-mini (Figure 3) lists eight risk rows; the language in the "mitigation" column for the liability-cap row maps almost verbatim onto the `liability_cap_short` and `liability_cap_zero_carveouts` entries in `knowledge_base.py`. The conditions panel for the same run (Figure 5) breaks into PRE-SIGNATURE MUSTs and HIGH-PRIORITY items — that structure isn't in the prompt; the model picked it up from the precedent text the specialists pulled in.
 
-![The pre-signature conditions panel from the mixed-contract run. Each bullet is a concrete negotiation ask the model derived from a knowledge-base entry the Compliance / Legal / Data specialist retrieved during analysis.](fig_mixed_conditions.png){ width=100% }
+![The pre-signature conditions panel from the mixed-contract run. Each bullet is a concrete negotiation ask the model derived from a knowledge-base entry the Compliance / Legal / Data specialist retrieved during analysis.](fig_mixed_conditions.png){ width=90% }
 
 The balanced contract run on the same model (Figure 6) lists seven risk rows. Every row is real — the 2× prior 12 months' fees liability cap, the audit and certification commitments without a hard right to audit, the 90-day data-export window without machine-readable formats, the IP indemnity that gives the vendor sole control of defence — but the verdict is still CONDITIONAL-GO at risk 78, which is harder to defend than the risk-85 mixed-contract verdict. The balanced contract is a *better* contract on most axes; the model's score doesn't reflect that as sharply as it should. Tighter prompt calibration would help; a real human reviewer would land lower.
 
-![The balanced-contract risk matrix on gpt-5-mini. Seven rows, all real, but the score (78) is closer to the mixed-contract score (85) than the underlying difference in contract quality would suggest.](fig_balanced_risks.png){ width=100% }
+![The balanced-contract risk matrix on gpt-5-mini. Seven rows, all real, but the score (78) is closer to the mixed-contract score (85) than the underlying difference in contract quality would suggest.](fig_balanced_risks.png){ width=90% }
 
 ### 6.6 The test suite
 
