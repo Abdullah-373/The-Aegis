@@ -238,6 +238,8 @@ The **live-analysis view** shows three cards (Alex / Sam / Maya) streaming Markd
 
 The **verdict dashboard** shows a radial risk gauge, the verdict word in semantic colour (PROCEED / WALK AWAY / MAYBE), a four-row metrics column on the right (time, tokens, cost, model), the full risk matrix, the conditions list when the verdict is CONDITIONAL-GO, and a collapsible transcripts panel.
 
+Note on the verdict word: the backend ruling is a strict Pydantic `Literal["GO", "NO-GO", "CONDITIONAL-GO"]` because downstream code parses the JSON and an enum is easier to switch on than a marketing label. The frontend maps those three machine values to friendlier user-facing words at render time — `GO` → **PROCEED**, `NO-GO` → **WALK AWAY**, `CONDITIONAL-GO` → **MAYBE**. The mapping lives in the dashboard's small state machine, not in the schema, so the JSON the cache stores and the JSON the test suite asserts against stays canonical. Every figure in this report that shows the word **MAYBE** on a verdict card is rendering the same `"CONDITIONAL-GO"` value the schema enforces.
+
 A **Past Reports drawer** lists previous cached rulings with verdict, risk score, model badge, token count, timestamp, and a delete affordance. Click any card to re-open the full transcripts without re-running the pipeline. Esc closes it.
 
 `Ctrl+Enter` from setup starts the run. `Esc` cancels a running analysis or closes the open panel.
@@ -407,11 +409,13 @@ A third PDF, `sample_contract.pdf`, lives in `samples/` for backwards compatibil
 
 Each row is a Full-mode run on the live API. Costs are list-price at published per-million-token rates. The `gpt-4o-mini` row matches the JSON export at `docs/sample_verdicts/contract_balanced__gpt-4o-mini.json`. The `gpt-5-mini` rows are read off the dashboard screenshots in `docs/fig_balanced_verdict.png` and `docs/fig_mixed_verdict.png`.
 
-| Document               | Model         | Time      | Tokens | Cost (list) | Verdict        | Risk |
-|------------------------|---------------|-----------|--------|-------------|----------------|------|
-| `contract_balanced.pdf`| `gpt-5-mini`  | 298.03 s  | 5,864  | \$0.0034    | CONDITIONAL-GO | 78   |
-| `contract_balanced.pdf`| `gpt-4o-mini` | 100.54 s  | 4,241  | \$0.001422  | CONDITIONAL-GO | 70   |
-| `contract_mixed.pdf`   | `gpt-5-mini`  | 268.25 s  | 5,227  | \$0.0038    | CONDITIONAL-GO | 85   |
+| Document   | Model         | Time      | Tokens | Cost (list) | Verdict        | Risk |
+|------------|---------------|-----------|--------|-------------|----------------|------|
+| balanced   | `gpt-5-mini`  | 298.03 s  | 5,864  | \$0.0034    | CONDITIONAL-GO | 78   |
+| balanced   | `gpt-4o-mini` | 100.54 s  | 4,241  | \$0.001422  | CONDITIONAL-GO | 70   |
+| mixed      | `gpt-5-mini`  | 268.25 s  | 5,227  | \$0.0038    | CONDITIONAL-GO | 85   |
+
+*"balanced" and "mixed" are the two PDFs in `samples/` — `contract_balanced.pdf` and `contract_mixed.pdf`. Shortened in the Document column so the row fits on one line.*
 
 Two things to call out.
 
@@ -443,7 +447,7 @@ The Planner picks two-to-five specialists per run, and the set is not stable acr
 
 Tool-call queries are model-chosen, so the precedent entries `search_precedent` returns are different across runs. A specialist that queries "liability cap" gets one set of precedents; one that queries "indemnity carve-outs" gets another.
 
-Footnote on the scoring rubric. V3 added a rubric to Maya's prompt (§3) that maps `risk_score >= 75` to verdict `NO-GO`. The screenshot shows risk 85 with verdict CONDITIONAL-GO, which violates the rubric. Either the run pre-dated the rubric commit (`7e0c72f`) on that branch, or the model treated the rubric as advice instead of a hard rule. Honest read: the rubric is a prompt-level nudge that tightens the score distribution but does not turn the verdict band into a guarantee. The real fix is post-validation logic in Python that downgrades the verdict when the score crosses the band threshold — listed in §7's "What's genuinely missing."
+Footnote on the scoring rubric. V3 added a rubric to Maya's prompt (§3) that maps `risk_score >= 75` to verdict `NO-GO`. The screenshot shows risk 85 with the UI badge **MAYBE** (which the frontend renders for the underlying `CONDITIONAL-GO` JSON value — see §4.7), which violates the rubric either way. Either the run pre-dated the rubric commit (`7e0c72f`) on that branch, or the model treated the rubric as advice instead of a hard rule. Honest read: the rubric is a prompt-level nudge that tightens the score distribution but does not turn the verdict band into a guarantee. The real fix is post-validation logic in Python that downgrades the verdict when the score crosses the band threshold — listed in §7's "What's genuinely missing."
 
 The cache eliminates this variance for repeat queries on the same document, which is its job. Cold runs against the same document will keep drifting between adjacent verdict bands. Expected for sampled LLM output, not a bug.
 
