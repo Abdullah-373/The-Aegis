@@ -44,7 +44,7 @@ Both modes write to the same cache and emit the same verdict shape, so the dashb
 
 Maya's output ends with a fenced JSON block that always validates against this schema:
 
-- `verdict` — `GO`, `NO-GO`, or `CONDITIONAL-GO` (rendered to users as **PROCEED**, **WALK AWAY**, **MAYBE**)
+- `verdict` — `GO`, `NO-GO`, or `CONDITIONAL-GO` (the UI renders `CONDITIONAL-GO` as **MAYBE**; the other two display verbatim)
 - `risk_score` — integer 0 to 100, scored against an explicit additive rubric in Maya's prompt
 - `headline` — one-line summary
 - `risks` — at least four rows, each with `Low`/`Medium`/`High` likelihood and impact and a concrete mitigation
