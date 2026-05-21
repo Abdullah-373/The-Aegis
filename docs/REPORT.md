@@ -431,7 +431,7 @@ A second click on the same PDF and the same model returns from the SQLite cache.
 |-----------------------------------------------------------|--------------|-----------|---------------|
 | gpt-5-mini on `contract_balanced.pdf` — 298.03 s, \$0.0034| **< 100 ms** | **\$0.00**| 298.03 s |
 | gpt-5-mini on `contract_mixed.pdf` — 268.25 s, \$0.0038   | **< 100 ms** | **\$0.00**| 268.25 s |
-| gpt-4o-mini on `contract_balanced.pdf` — 100.54 s, \$0.0014| **< 100 ms** | **\$0.00**| 100.54 s |
+| gpt-4o-mini on `contract_balanced.pdf` — 100.54 s, \$0.001422 | **< 100 ms** | **\$0.00**| 100.54 s |
 
 Zero API calls on a hit. The wall-clock floor is the WebSocket round-trip (the SQLite lookup itself is sub-millisecond). The headline replay number used to be ~1.7 s, but that was mostly the drip-feed animation from §5.11; the post-`0067800` build returns the cached transcripts in one frame per agent and the replay arrives as fast as the socket allows.
 

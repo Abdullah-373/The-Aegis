@@ -95,7 +95,7 @@ A second click on the same PDF and the same model returns from the SQLite cache:
 |---------------------------------------------|--------------|---------------------|---------------|
 | `gpt-5-mini` on `contract_balanced.pdf` (298.03 s, $0.0034)  | **< 100 ms** | **$0.00** | full 298.03 s |
 | `gpt-5-mini` on `contract_mixed.pdf` (268.25 s, $0.0038)     | **< 100 ms** | **$0.00** | full 268.25 s |
-| `gpt-4o-mini` on `contract_balanced.pdf` (100.54 s, $0.0014) | **< 100 ms** | **$0.00** | full 100.54 s |
+| `gpt-4o-mini` on `contract_balanced.pdf` (100.54 s, $0.001422) | **< 100 ms** | **$0.00** | full 100.54 s |
 
 Zero API calls on a hit. The wall-clock floor on a replay is the WebSocket round-trip; the SQLite lookup itself is sub-millisecond.
 
@@ -148,7 +148,7 @@ The build scans the template for actual class usage and emits only those rules, 
 - **Token counting / cost** — `tiktoken` for OpenAI (`o200k_base` for gpt-5 family), `len(text) // 4` fallback for Gemini, prices from a published-rates table
 - **PDF** — `pypdf` with optional OCR fallback via Tesseract
 - **Knowledge base** — pure-Python TF-IDF + cosine similarity over 34 in-code precedents
-- **Tests** — `pytest`, 46 tests covering parsing, schema validation, retry classification, cost calculation, the API endpoints, knowledge-base retrieval, tool registration, graph topology, provider detection, the provider factory's gpt-5 temperature handling, the tiktoken counter, and the scoring rubric
+- **Tests** — `pytest`, 53 tests covering parsing, schema validation, retry classification, cost calculation, the API endpoints, knowledge-base retrieval, tool registration, graph topology, provider detection, the provider factory's gpt-5 temperature handling, the tiktoken counter, and the scoring rubric
 
 ## Architecture at a glance
 
@@ -204,7 +204,7 @@ The app is built for **single-user, local-network use**. The defaults reflect th
 │   ├── styles.src.css         Tailwind entry source
 │   └── styles.css             Pre-built minified Tailwind output (committed)
 ├── tests/
-│   └── test_main.py           46 unit + integration tests
+│   └── test_main.py           53 unit + integration tests
 ├── samples/
 │   ├── sample_contract.pdf    Adversarial test contract (V1/V2 original)
 │   ├── contract_balanced.pdf  Well-drafted SaaS Master Licence
