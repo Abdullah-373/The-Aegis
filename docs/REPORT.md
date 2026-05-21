@@ -71,11 +71,11 @@ Source code: [github.com/Abdullah-373/The-Aegis](https://github.com/Abdullah-373
 
 The Aegis reads contracts. You drop a PDF in, three agents argue about it, and you get a one-word verdict — GO, NO-GO, or CONDITIONAL-GO — together with a 0–100 risk score and the redlines you would need before signing.
 
-The same repository carries three versions of the app, because each one taught me what the next had to fix. V1 ran three prompts in a row: Alex argues to sign, Sam argues against, Maya rules. It worked, and it was honest enough to call itself three prompts in a line, not a multi-agent system. V2 replaced the middle with a LangGraph state machine: a Planner picks two-to-five specialists from {Financial, Legal, Data, Compliance, Operations}, each one gets a `search_precedent` tool over 34 hand-written risk patterns, and a critique step lets Alex and Sam push back on Maya. If either dissents, Maya rules again. V3 wired OpenAI in next to Gemini so the same pipeline runs on either an `AIza...` or an `sk-...` key, dropped the Tailwind CDN for a real build, swapped `len(text) // 4` for `tiktoken`-based cost counting, and added a scoring rubric so the same contract does not slide two verdict bands when you swap models.
+The same repository holds three versions of the app, because each one taught me what the next had to fix. V1 ran three prompts in sequence: Alex argues to sign, Sam argues against, Maya rules. It worked, and it was honest enough to call itself three prompts in a line, not a multi-agent system. V2 replaced the middle of the pipeline with a LangGraph state machine: a Planner picks two-to-five specialists from {Financial, Legal, Data, Compliance, Operations}, each one gets a `search_precedent` tool over 34 hand-written risk patterns, and a critique step lets Alex and Sam push back on Maya. If either dissents, Maya rules again. V3 added OpenAI alongside Gemini so the same pipeline runs on either an `AIza...` or an `sk-...` key, dropped the Tailwind CDN for a real build, swapped `len(text) // 4` for `tiktoken`-based cost counting, and added a scoring rubric so the same contract does not drift across two verdict bands when the model changes.
 
-Both pipelines ship behind a mode toggle. Fast keeps the V1 design for free-tier runs (three calls per analysis). Full runs the LangGraph pipeline (8–15 calls) and is the default on a paid OpenAI key. Either mode writes to the same SQLite cache keyed on `SHA-256(extracted_text + model_name)`, so a second click on the same PDF returns the verdict with zero API calls.
+Both pipelines sit behind a mode toggle. Fast retains the V1 design for free-tier runs (three calls per analysis). Full runs the LangGraph pipeline (8–15 calls) and is the default on a paid OpenAI key. Either mode writes to the same SQLite cache keyed on `SHA-256(extracted_text + model_name)`, so a second click on the same PDF returns the verdict with zero API calls.
 
-Live numbers from the two sample contracts in the repo (both over the 100,000-character extractor limit, so both ran the map-reduce condense path):
+Measurements from the two sample contracts in the repository (both over the 100,000-character extractor limit, so both ran the map-reduce condense path):
 
 - `gpt-5-mini` on `contract_balanced.pdf` — CONDITIONAL-GO, **risk 78**, **5,864 tokens**, **\$0.0034**, 298.03 s original / sub-100 ms replay.
 - `gpt-5-mini` on `contract_mixed.pdf` — CONDITIONAL-GO, **risk 85**, **5,227 tokens**, **\$0.0038**, 268.25 s original.
@@ -88,11 +88,11 @@ The `gpt-4o-mini` figures match the JSON export under `docs/sample_verdicts/`. T
 
 ## 1. The Problem
 
-Contracts are long. Nobody reads them. You skim and miss the bad parts, or you pay a lawyer hundreds of dollars per page. Neither option works well on the kind of mid-size deal where legal spend would be a meaningful fraction of the contract value.
+Contracts are long. Nobody reads them. Either you skim and miss the dangerous clauses, or you pay a lawyer hundreds of dollars per page. Neither option scales to the mid-sized deals where legal fees consume a meaningful fraction of the contract value.
 
-The obvious move is to throw an LLM at the PDF and ask for a summary. That fails for two reasons. One model writing one summary always lands in the middle — it averages the upside and the downside into something bland that doesn't actually help you decide whether to sign. What a reviewer needs is the *spread*: the strongest reading of the deal *and* the worst reading, both at full strength, plus a third opinion. The second problem is downstream. If the output is free-form text, you need to parse prose with regular expressions to get a yes/no out of it, and that parsing breaks the first time the model phrases its answer slightly differently.
+The obvious approach is to send the PDF to an LLM and ask for a summary. This fails for two reasons. A single model producing a single summary lands in the middle: it averages the upside and downside into a bland reading that offers no real basis for the decision to sign or walk away. What a reviewer needs is the *spread*: the strongest reading of the deal *and* the worst reading, both at full strength, plus a third opinion. The second problem is downstream. If the output is free-form text, downstream code has to parse prose with regular expressions to extract a yes/no, and that parsing breaks the first time the model phrases its answer differently.
 
-The Aegis tries to fix both at once. It never writes a neutral summary. You see Alex's bullish case and Sam's attack as two separate transcripts, then Maya emits a verdict as a JSON object with a fixed Pydantic schema. The JSON goes to downstream code, the transcripts go to the human. A third problem only showed up halfway through the build — if you already pay for an OpenAI key, you shouldn't need a Gemini key just to use this app. V3 fixed that. Paste any supported key, the right provider gets picked for you, and the model picker auto-switches.
+The Aegis addresses both problems at once. It never produces a neutral summary. Alex's bullish case and Sam's attack arrive as two separate transcripts, then Maya emits a verdict as a JSON object that conforms to a fixed Pydantic schema. The JSON feeds downstream code; the transcripts go to the reviewer. A third problem surfaced midway through the build: if you already pay for an OpenAI key, you should not need a Gemini key to use the app. V3 fixed this. Paste any supported key and the correct provider is selected automatically; the model picker switches with it.
 
 ---
 
@@ -114,7 +114,7 @@ The Aegis sits where three lines of research meet: multi-agent LLM systems, retr
 
 ## 3. Design Choices
 
-The reasoning behind the pieces, not a tour of every library. Where a decision came back to bite me, I point at the relevant story in §5.
+The reasoning behind each component, not a survey of every library. Where a decision later caused trouble, I point to the relevant story in §5.
 
 **Three agents, not one summary.** A single summary hides the gap between the optimistic and pessimistic read. That gap is the whole point of a contract review. I picked a fixed three-role pipeline — Alex (Strategist), Sam (Red Team), Maya (Judge) — instead of free-form multi-agent chat. Roles are hard-coded in `HELPERS` (`main.py:216`). The transcripts stay auditable, which matters when a reviewer has to justify their reading to a manager who didn't read the contract either.
 
@@ -392,7 +392,7 @@ The actual SQLite lookup is sub-millisecond. The actual WebSocket round-trip is 
 
 ## 6. Numbers
 
-What I measured against the live OpenAI API on the V3 pipeline. Every measurement is traceable to either a JSON export under `docs/sample_verdicts/` or one of the eight dashboard screenshots under `docs/`.
+These are the measurements I took against the live OpenAI API on the V3 pipeline. Every measurement is traceable to either a JSON export under `docs/sample_verdicts/` or one of the eight dashboard screenshots under `docs/`.
 
 ### 6.1 The two test documents
 
@@ -530,8 +530,8 @@ Brutally honest list. The app does not do these things.
 
 Three things stayed with me after shipping V3.
 
-The first is that the structure mattered more than the model. A single prompt to `gpt-5` on `contract_balanced.pdf` would have produced a fluent paragraph that hid the disagreement between the optimistic and pessimistic readings. Three roles, separated, kept the disagreement visible. That is what a reviewer needs to act on — the spread, not the average. The architecture was not a way to use more models; it was a way to refuse to summarise.
+First, the structure mattered more than the model. A single prompt to `gpt-5` on `contract_balanced.pdf` would have produced a fluent paragraph that hid the disagreement between the optimistic and pessimistic readings. Three roles, separated, kept the disagreement visible. That is what a reviewer needs to act on — the spread, not the average. The architecture was not a way to use more models; it was a way to refuse to summarise.
 
-The second is that the boring parts decided whether the app survived. The recovery chain, the cache, the integration tests, the `tiktoken` counter — none of them are interesting demos. All of them are the difference between a project that runs on my laptop and one that holds up to a code review. V1 had the right idea; V3 is the same idea with the unglamorous parts done.
+Second, the unglamorous parts decided whether the app survived. The recovery chain, the cache, the integration tests, the `tiktoken` counter — none of them are interesting demos. All of them are the difference between a project that runs on my laptop and one that holds up to a code review. V1 had the right idea; V3 is the same idea with the unglamorous parts done.
 
-The third is what I still do not know. The scoring rubric tightens the score distribution but does not enforce it (§6.4). The cache eliminates non-determinism on a repeat query but not on a cold one. A real multi-agent debate, where Sam can interrupt Alex mid-sentence, is a different project. So is one with authentication, TLS, and a per-user cache. The Aegis is honest about all of this, but honesty is not a solution — it is a starting list for the next version.
+Third, what I still do not know. The scoring rubric tightens the score distribution but does not enforce it (§6.4). The cache eliminates non-determinism on a repeat query but not on a cold one. A real multi-agent debate, where Sam can interrupt Alex mid-sentence, is a different project. So is one with authentication, TLS, and a per-user cache. The Aegis is honest about each of these gaps, but honesty is not a solution — it is the starting list for the next version.
