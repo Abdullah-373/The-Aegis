@@ -244,4 +244,4 @@ MIT — see [`LICENSE`](LICENSE).
 
 **Abdullah Hasan** · Student ID 807271
 
-University final project. The full technical report (architecture, design decisions, debugging stories, empirical assessment) is in [`docs/REPORT.md`](docs/REPORT.md) (markdown source) and [`docs/The_Aegis_Final_Report_v3.pdf`](docs/The_Aegis_Final_Report_v3.pdf) (rendered PDF).
+
