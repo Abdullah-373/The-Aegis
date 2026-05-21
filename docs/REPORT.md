@@ -8,22 +8,25 @@ toc-depth: 2
 documentclass: article
 geometry: margin=1in
 fontsize: 11pt
-mainfont: "DejaVu Serif"
+mainfont: "DejaVu Sans"
 monofont: "DejaVu Sans Mono"
+sansfont: "DejaVu Sans"
 colorlinks: true
-linkcolor: "aegisslate"
-urlcolor: "aegisslate"
-toccolor: "aegisslate"
+linkcolor: "aegisblue"
+urlcolor: "aegisblue"
+toccolor: "aegisblue"
 header-includes:
   - \usepackage{xcolor}
+  - \definecolor{aegisblue}{HTML}{1D4ED8}
+  - \definecolor{aegisbluedark}{HTML}{1E3A8A}
   - \definecolor{aegisamber}{HTML}{B45309}
   - \definecolor{aegisslate}{HTML}{1E293B}
   - \definecolor{aegisamberpale}{HTML}{FEF3C7}
   - \definecolor{aegisslatepale}{HTML}{F1F5F9}
   - \usepackage{sectsty}
-  - \sectionfont{\color{aegisamber}}
-  - \subsectionfont{\color{aegisslate}}
-  - \subsubsectionfont{\color{aegisslate}}
+  - \sectionfont{\color{aegisblue}}
+  - \subsectionfont{\color{aegisbluedark}}
+  - \subsubsectionfont{\color{aegisbluedark}}
   - \usepackage{booktabs}
   - \usepackage{colortbl}
   - \usepackage{array}
@@ -33,7 +36,14 @@ header-includes:
   - \usepackage{framed}
   - \definecolor{shadecolor}{HTML}{F8FAFC}
   - \usepackage{caption}
-  - \captionsetup{labelfont={color=aegisamber,bf},textfont={small,it}}
+  - \captionsetup{labelfont={color=aegisblue,bf},textfont={small,it}}
+  - \usepackage{titling}
+  - \pretitle{\begin{flushleft}\Huge\color{aegisblue}\sffamily\bfseries}
+  - \posttitle{\par\vspace{4pt}\color{aegisblue}\hrule height 1.5pt\end{flushleft}\vspace{18pt}}
+  - \preauthor{\begin{flushleft}\large\color{aegisslate}\sffamily}
+  - \postauthor{\end{flushleft}}
+  - \predate{}
+  - \postdate{}
   - \usepackage{graphicx}
   - \usepackage{tcolorbox}
   - \tcbuselibrary{breakable,skins}
@@ -50,9 +60,6 @@ header-includes:
   - \setlength{\headheight}{14pt}
 ---
 
-# The Aegis: A Multi-Provider Contract Tribunal, Three Versions In
-
-**Abdullah Hasan** · Student ID 807271
 Source code: [github.com/Abdullah-373/The-Aegis](https://github.com/Abdullah-373/The-Aegis)
 
 ---
@@ -72,7 +79,7 @@ Live numbers from the two sample contracts in the repo (both over the 100,000-ch
 - `gpt-4o-mini` on `contract_balanced.pdf` — CONDITIONAL-GO, **risk 70**, 4,241 tokens, **\$0.001422**, 100.54 s. Same verdict band as `gpt-5-mini` at about 2.4× lower cost and 3× lower latency.
 - Cache replay on any of these: **\$0.00**, zero outbound calls, under 100 ms.
 
-The `gpt-4o-mini` figures match the JSON export committed at `docs/sample_verdicts/contract_balanced__gpt-4o-mini.json`. The `gpt-5-mini` figures are read off the dashboard screenshots in `docs/`. A reviewer who wants to double-check the four-decimal numbers can `cat` the JSON.
+The `gpt-4o-mini` figures match the JSON export under `docs/sample_verdicts/`. The `gpt-5-mini` figures are read off the dashboard screenshots in `docs/`. A reviewer who wants to double-check the four-decimal numbers can `cat` the JSON.
 
 ---
 
