@@ -1,5 +1,5 @@
 ---
-title: "The Aegis: A Multi-Provider Contract Tribunal, Three Versions In"
+title: "The Aegis: An LLM Tribunal for Contract Review"
 author:
   - "Abdullah Hasan — Student ID 807271"
 date: ""
